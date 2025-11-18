@@ -1,0 +1,13 @@
+{
+    "cSpell.words": [
+        "autoflush",
+        "checkpw",
+        "gensalt",
+        "hashpw",
+        "healthcheck",
+        "levelname",
+        "onupdate",
+        "sessionmaker",
+        "trustedhost"
+    ]
+}
