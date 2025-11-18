@@ -1,7 +1,6 @@
 from typing import Optional, List
 from sqlmodel import Session, select
 from app.db.models.user import User
-from app.db.config import get_session
 
 class UserService:
 	def create_user(self, user_data: dict, session: Session) -> User:

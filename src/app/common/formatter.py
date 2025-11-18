@@ -9,3 +9,8 @@ class SuccessResponse(BaseModel):
 class ErrorResponse(BaseModel):
     success: bool = False
     message: str
+    
+class TokenPayload(BaseModel):
+    id: int
+    email: str
+    role: str
