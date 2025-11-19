@@ -10,7 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from src.app.config.settings import settings
 from src.app.db.config import engine
 import sqlmodel
-from src.app.db.models import *
+from src.app.db.models.user import *
+from src.app.db.models.jobs import *
 
 # this is the Alembic Config object
 config = context.config
