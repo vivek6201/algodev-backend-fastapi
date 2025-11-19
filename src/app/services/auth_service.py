@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
-import bcrypt
+from bcrypt import hashpw, gensalt, checkpw
 from app.config.settings import settings
 from ..common.formatter import TokenPayload
 from fastapi.security import OAuth2PasswordBearer
@@ -12,7 +12,6 @@ oauth_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth")
 class AuthService:
     def __init__(self):
         self.settings = settings
-        self.bcrypt = bcrypt
 
     def get_current_user(self, token: str = Depends(oauth_scheme)) -> TokenPayload:
         payload = self.verify_token(token)
@@ -47,7 +46,7 @@ class AuthService:
             return None
 
     def hash_password(self, password: str) -> str:
-        return self.bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        return hashpw(password.encode('utf-8'), gensalt()).decode('utf-8')
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        return self.bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        return checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))

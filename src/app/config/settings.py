@@ -1,7 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
-
-
 class Settings(BaseSettings):
     # App Settings
     PROJECT_NAME: str = "Algorithmic Dev"

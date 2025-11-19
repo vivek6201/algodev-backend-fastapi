@@ -8,18 +8,21 @@ from app.common.formatter import TokenPayload
 auth_router = APIRouter()
 auth_controller = AuthController()
 
+
 @auth_router.post("/login")
 async def login(body: Login, session: Session = Depends(get_session)):
     return await auth_controller.login(body, session)
+
 
 @auth_router.post("/signup")
 async def signup(body: Signup, session: Session = Depends(get_session)):
     return await auth_controller.signup(body, session)
 
+
 @auth_router.post("/refresh-token")
 async def refresh_token():
     pass
-    
+
 
 @auth_router.post("/logout/{user_id}")
 async def logout(user_id: int, session: Session = Depends(get_session), current_user: TokenPayload = Depends(auth_controller.auth_service.get_current_user)):

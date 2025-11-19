@@ -33,7 +33,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/app"]
+packages = ["src"]
 
 [tool.black]
 line-length = 100
@@ -58,3 +58,6 @@ exclude = [".venv", "alembic"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
+
+[project.scripts]
+start = "src.server:main"
