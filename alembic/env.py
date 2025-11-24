@@ -2,6 +2,8 @@ from logging.config import fileConfig
 from alembic import context
 import sys
 from pathlib import Path
+from alembic.autogenerate import renderers
+from sqlalchemy.dialects.postgresql import ENUM
 
 # Add src to path FIRST, before any app imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -25,6 +27,13 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Add your model's MetaData object here for 'autogenerate' support
 target_metadata = sqlmodel.SQLModel.metadata
+
+@renderers.dispatch_for(ENUM)
+def render_enum(type_, autogen_context):
+    return "sa.Enum(%s, name='%s', create_type=True, checkfirst=True)" % (
+        ", ".join("'%s'" % e for e in type_.enums),
+        type_.name
+    )
 
 
 def run_migrations_offline() -> None:

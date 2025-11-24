@@ -1,2 +1,0 @@
-class JobService:
-    pass
