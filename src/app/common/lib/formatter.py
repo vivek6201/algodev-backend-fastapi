@@ -1,4 +1,6 @@
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -10,22 +12,16 @@ class SuccessResponse(JSONResponse):
         data: Any = None,
         status_code: int = 200,
         headers: Optional[Dict[str, str]] = None,
-        **kwargs
+        **kwargs,
     ):
-        # 1. Start with the standard structure
         content = {"success": True, "message": message}
 
-        # 2. Add 'data' if present
         if data is not None:
-            content["data"] = data
+            content["data"] = jsonable_encoder(data)
 
-        # 3. CRITICAL: Add any extra keyword arguments to the JSON content
-        # This allows you to pass extra fields like 'meta', 'trace_id', etc.
         if kwargs:
             content.update(kwargs)
 
-        # 4. Initialize the parent JSONResponse with the finalized content
-        # Note: We do NOT pass **kwargs here, preventing the TypeError
         super().__init__(content=content, status_code=status_code, headers=headers)
 
 
@@ -36,14 +32,13 @@ class ErrorResponse(JSONResponse):
         error: Any = None,
         headers: Optional[Dict[str, str]] = None,
         status_code: int = 400,
-        **kwargs
+        **kwargs,
     ):
         content = {"success": False, "message": message}
 
         if error is not None:
-            content["error"] = error
+            content["error"] = jsonable_encoder(error)
 
-        # Merge extra fields into the JSON response body
         if kwargs:
             content.update(kwargs)
 

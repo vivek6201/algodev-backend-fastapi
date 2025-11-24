@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from app.modules.auth.routes import auth_router
 from app.modules.jobs.routes import jobs_router
 from app.modules.users.routes import user_router

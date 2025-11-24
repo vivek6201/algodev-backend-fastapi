@@ -1,8 +1,11 @@
-from sqlmodel import Relationship, SQLModel, Field
-from typing import List, Optional, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+from typing import List, Optional
+
+from sqlmodel import Field, Relationship, SQLModel
+
 from app.common.db.utils import pg_enum
+
 
 class JobType(Enum):
     FULL_TIME = "FULL_TIME"
@@ -27,23 +30,17 @@ class ApplicationStatus(Enum):
     REJECTED = "REJECTED"
     HIRED = "HIRED"
 
+
 class JobCategoryLink(SQLModel, table=True):
     # Composite Primary Key (Both keys together are unique)
-    job_id: Optional[int] = Field(
-        default=None, foreign_key="job.id", primary_key=True
-    )
-    category_id: Optional[int] = Field(
-        default=None, foreign_key="category.id", primary_key=True
-    )
+    job_id: Optional[int] = Field(default=None, foreign_key="job.id", primary_key=True)
+    category_id: Optional[int] = Field(default=None, foreign_key="category.id", primary_key=True)
 
 
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
     name: str
-    jobs: List["Job"] = Relationship(
-        back_populates="categories",
-        link_model=JobCategoryLink
-    )
+    jobs: List["Job"] = Relationship(back_populates="categories", link_model=JobCategoryLink)
 
 
 class Company(SQLModel, table=True):
@@ -74,14 +71,11 @@ class Job(JobBase, table=True):
 
     # Fields specific to Job table (not in Base because they might be conditional or system managed)
     external_apply_url: Optional[str] = None
-    
-    categories: List["Category"] = Relationship(
-        back_populates="jobs",
-        link_model=JobCategoryLink
-    )
+
+    categories: List["Category"] = Relationship(back_populates="jobs", link_model=JobCategoryLink)
 
     owner_id: int = Field(foreign_key="users.id")
-    owner: Optional["Users"] = Relationship(back_populates="posted_jobs")
+    owner: Optional["Users"] = Relationship(back_populates="posted_jobs")  # noqa: F821
     company_name: Optional[str] = None
 
     company_id: Optional[int] = Field(default=None, foreign_key="company.id")
@@ -91,7 +85,9 @@ class Job(JobBase, table=True):
     applications: List["JobApplication"] = Relationship(back_populates="job")
 
     created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now})
+    updated_at: datetime = Field(
+        default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now}
+    )
 
 
 class JobApplication(SQLModel, table=True):
@@ -102,15 +98,14 @@ class JobApplication(SQLModel, table=True):
     job: Optional[Job] = Relationship(back_populates="applications")
 
     candidate_id: int = Field(foreign_key="users.id")
-    candidate: Optional["Users"] = Relationship(back_populates="applications")
+    candidate: Optional["Users"] = Relationship(back_populates="applications")  # noqa: F821
 
     # Application Data
     resume_url: str
     cover_letter: Optional[str] = None
 
     # Recruiter Actions
-    status: ApplicationStatus = pg_enum(
-        ApplicationStatus, default=ApplicationStatus.APPLIED)
+    status: ApplicationStatus = pg_enum(ApplicationStatus, default=ApplicationStatus.APPLIED)
     recruiter_notes: Optional[str] = None
 
     applied_at: datetime = Field(default_factory=datetime.now)

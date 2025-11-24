@@ -1,13 +1,15 @@
-from sqlmodel import SQLModel, Field, Column, DateTime, func
-from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
-from sqlmodel import Relationship
 from enum import Enum
+from typing import List, Optional
+
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
+
 from app.common.db.utils import pg_enum
 
 
 class Role(str, Enum):
     """User role enumeration"""
+
     ADMIN = "ADMIN"
     USER = "USER"
     MODERATOR = "MODERATOR"
@@ -25,23 +27,22 @@ class Users(SQLModel, table=True):
     role: Role = pg_enum(Role, default=Role.USER, nullable=False)
 
     refresh_token: Optional[str] = Field(default=None, index=True)
-    
+
     # Email verification
     email_verified: bool = Field(default=False)
     verification_token: Optional[str] = Field(default=None)
     verification_token_expires: Optional[datetime] = Field(default=None)
 
     # Relationships
-    posted_jobs: List["Job"] = Relationship(back_populates="owner")
-    applications: List["JobApplication"] = Relationship(
-        back_populates="candidate")
+    posted_jobs: List["Job"] = Relationship(back_populates="owner")  # noqa: F821
+    applications: List["JobApplication"] = Relationship(back_populates="candidate")  # noqa: F821
 
     # timestamp fields
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True),
-                         server_default=func.now(), nullable=False)
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     )
     updated_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), onupdate=func.now(
-        ), server_default=func.now(), nullable=False)
+        sa_column=Column(
+            DateTime(timezone=True), onupdate=func.now(), server_default=func.now(), nullable=False
+        )
     )

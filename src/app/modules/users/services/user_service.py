@@ -1,44 +1,56 @@
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlmodel import Session, select
+
 from app.modules.users.models.user import Users
 
+
 class UserService:
-	def create_user(self, user_data: dict, session: Session) -> Users:
-		user = Users(**user_data)
-		session.add(user)
-		session.commit()
-		session.refresh(user)
-		return user
+    def create_user(self, user_data: dict, session: Session) -> Users:
+        user = Users(**user_data)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
 
-	def delete_user(self, user_id: int, session: Session) -> bool:
-		user = session.get(Users, user_id)
-		if not user:
-			return False
-		session.delete(user)
-		session.commit()
-		return True
+    def delete_user(self, user_id: int, session: Session) -> bool:
+        user = session.get(Users, user_id)
+        if not user:
+            return False
+        session.delete(user)
+        session.commit()
+        return True
 
-	def update_user(self, user_id: int, update_data: dict, session: Session) -> Optional[Users]:
-		user = session.get(Users, user_id)
-		if not user:
-			return None
-		for key, value in update_data.items():
-			setattr(user, key, value)
-		session.add(user)
-		session.commit()
-		session.refresh(user)
-		return user
+    def update_user(self, user_id: int, update_data: dict, session: Session) -> Optional[Users]:
+        user = session.get(Users, user_id)
+        if not user:
+            return None
+        for key, value in update_data.items():
+            setattr(user, key, value)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
 
-	def get_user(self, session: Session, user_id: Optional[int] = None, email: Optional[str] = None, username: Optional[str] = None, verification_token: Optional[str] = None) -> Optional[Users]:
-		if user_id:
-			return session.get(Users, user_id)
-		if email:
-			return session.exec(select(Users).where(Users.email == email)).first()
-		if username:
-			return session.exec(select(Users).where(Users.username == username)).first()
-		if verification_token:
-			return session.exec(select(Users).where(Users.verification_token == verification_token)).first()
-		return None
+    def get_user(
+        self,
+        session: Session,
+        user_id: Optional[int] = None,
+        email: Optional[str] = None,
+        username: Optional[str] = None,
+        verification_token: Optional[str] = None,
+    ) -> Optional[Users]:
+        if user_id:
+            return session.get(Users, user_id)
+        if email:
+            return session.exec(select(Users).where(Users.email == email)).first()
+        if username:
+            return session.exec(select(Users).where(Users.username == username)).first()
+        if verification_token:
+            return session.exec(
+                select(Users).where(Users.verification_token == verification_token)
+            ).first()
+        return None
 
-	def get_all_users(self, session: Session) -> List[Users]:
-		return list(session.exec(select(Users)))
+    def get_all_users(self, session: Session) -> List[Users]:
+        return list(session.exec(select(Users)))
