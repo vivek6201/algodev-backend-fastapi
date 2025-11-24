@@ -4,7 +4,6 @@ from datetime import datetime
 from enum import Enum
 from app.common.db.utils import pg_enum
 
-
 class JobType(Enum):
     FULL_TIME = "FULL_TIME"
     PART_TIME = "PART_TIME"
@@ -59,9 +58,7 @@ class Company(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
 
 
-class Job(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True, index=True)
-
+class JobBase(SQLModel):
     title: str
     slug: str = Field(index=True, unique=True)
     description: str
@@ -69,8 +66,15 @@ class Job(SQLModel, table=True):
     job_type: JobType = pg_enum(JobType)
     min_salary: Optional[int] = None
     max_salary: Optional[int] = None
-    external_apply_url: Optional[str] = None
     listing_type: ListingType = pg_enum(ListingType)
+
+
+class Job(JobBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
+
+    # Fields specific to Job table (not in Base because they might be conditional or system managed)
+    external_apply_url: Optional[str] = None
+    
     categories: List["Category"] = Relationship(
         back_populates="jobs",
         link_model=JobCategoryLink
@@ -87,8 +91,7 @@ class Job(SQLModel, table=True):
     applications: List["JobApplication"] = Relationship(back_populates="job")
 
     created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now, sa_column_kwargs={
-                                 "onupdate": datetime.now})
+    updated_at: datetime = Field(default_factory=datetime.now, sa_column_kwargs={"onupdate": datetime.now})
 
 
 class JobApplication(SQLModel, table=True):

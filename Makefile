@@ -1,8 +1,8 @@
 gen_migrations:
-	alembic revision --autogenerate -m "$(msg)"
+	uv run alembic revision --autogenerate -m "$(msg)"
 
 alembic_upgrade:
-	alembic upgrade head
+	uv run alembic upgrade head
 
 downgrade:
-	alembic downgrade -1
+	uv run alembic downgrade -1

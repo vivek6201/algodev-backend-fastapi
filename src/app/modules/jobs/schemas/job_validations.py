@@ -1,18 +1,12 @@
 from pydantic import BaseModel
 from typing import List
-from app.modules.jobs.models.jobs import JobType, ListingType
+from app.modules.jobs.models.jobs import JobType, ListingType, JobBase
 
 
-class JobBase(BaseModel):
-    title: str
-    description: str
-    location: str
+class JobCreateBase(JobBase):
+    category_id: List[int]
     min_salary: int
     max_salary: int
-    slug: str
-    job_type: JobType
-    category_id: List[int]
-
 
 class JobUpdateBase(BaseModel):
     title: str | None = None
@@ -25,7 +19,7 @@ class JobUpdateBase(BaseModel):
     category_id: List[int] | None = None
 
 
-class ThirdPartyJobCreate(JobBase):
+class ThirdPartyJobCreate(JobCreateBase):
     external_apply_url: str
     listing_type: ListingType = ListingType.ThirdParty
     company_name: str
@@ -36,7 +30,7 @@ class ThirdPartyJobUpdate(JobUpdateBase):
     company_name: str | None = None
 
 
-class DirectJobCreate(JobBase):
+class DirectJobCreate(JobCreateBase):
     listing_type: ListingType = ListingType.Direct
     company_id: int
 

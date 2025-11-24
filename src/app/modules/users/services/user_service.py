@@ -29,13 +29,15 @@ class UserService:
 		session.refresh(user)
 		return user
 
-	def get_user(self, session: Session, user_id: Optional[int] = None, email: Optional[str] = None, username: Optional[str] = None) -> Optional[Users]:
+	def get_user(self, session: Session, user_id: Optional[int] = None, email: Optional[str] = None, username: Optional[str] = None, verification_token: Optional[str] = None) -> Optional[Users]:
 		if user_id:
 			return session.get(Users, user_id)
 		if email:
 			return session.exec(select(Users).where(Users.email == email)).first()
 		if username:
 			return session.exec(select(Users).where(Users.username == username)).first()
+		if verification_token:
+			return session.exec(select(Users).where(Users.verification_token == verification_token)).first()
 		return None
 
 	def get_all_users(self, session: Session) -> List[Users]:

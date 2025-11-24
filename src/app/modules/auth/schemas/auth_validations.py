@@ -27,3 +27,6 @@ class Signup(BaseModel):
         if not (6 <= len(v) <= 16):
             raise ValueError("Password must be between 6 and 16 characters.")
         return v
+
+class VerifyEmail(BaseModel):
+    token: str

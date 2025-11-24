@@ -9,11 +9,11 @@ from sqlalchemy.dialects.postgresql import ENUM
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # NOW import app modules
-from src.app.config.settings import settings
-from src.app.db.config import engine
+from app.config.settings import settings
+from app.common.db.config import engine
 import sqlmodel
-from src.app.db.models.user import *
-from src.app.db.models.jobs import *
+from app.modules.users.models.user import *
+from app.modules.jobs.models.jobs import *
 
 # this is the Alembic Config object
 config = context.config

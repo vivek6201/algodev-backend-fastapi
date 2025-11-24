@@ -5,6 +5,7 @@ from app.modules.auth.schemas.auth_validations import Login, Signup
 from sqlmodel import Session
 from app.common.lib.formatter import TokenPayload
 from fastapi import Request
+from app.modules.auth.dependencies import RoleChecker, ALL_ROLES
 
 auth_router = APIRouter()
 auth_controller = AuthController()
@@ -26,5 +27,10 @@ async def refresh_token(request: Request, session: Session = Depends(get_session
 
 
 @auth_router.post("/logout/{user_id}")
-def logout(user_id: int, session: Session = Depends(get_session), current_user: TokenPayload = Depends(auth_controller.auth_service.get_current_user)):
+def logout(user_id: int, session: Session = Depends(get_session), current_user: TokenPayload = Depends(RoleChecker(ALL_ROLES))):
     return auth_controller.logout(user_id=user_id, session=session, current_user=current_user)
+
+@auth_router.get("/verify-email/{token}")
+def verify_email_link(token: str, session: Session = Depends(get_session)):
+    """Verify email via clickable link (GET request)"""
+    return auth_controller.verify_email(token, session)

@@ -1,18 +1,17 @@
 from fastapi import APIRouter
 from app.modules.users.controllers.user_controller import UserController
-from app.modules.auth.controllers.auth_controller import AuthController
 from fastapi import Depends
 from app.common.db.config import get_session
 from sqlmodel import Session   
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload 
 from app.modules.users.schemas.user_validation import UserUpdate    
+from app.modules.auth.dependencies import RoleChecker, ALL_ROLES    
     
 user_router = APIRouter()
 user_controller = UserController()
-auth_controller = AuthController()
 
 @user_router.get("/{user_id}")
-async def get_user(user_id: int, session: Session = Depends(get_session), current_user: TokenPayload = Depends(auth_controller.auth_service.get_current_user)):
+async def get_user(user_id: int, session: Session = Depends(get_session), current_user: TokenPayload = Depends(RoleChecker(ALL_ROLES))):
     if current_user.id != user_id:
         raise PermissionError("Unauthorized access to user data")
     
@@ -24,7 +23,7 @@ async def get_user(user_id: int, session: Session = Depends(get_session), curren
     return SuccessResponse(data=user_data, message="User retrieved successfully")
 
 @user_router.put("/{user_id}")
-async def update_user(user_id: int, user_data: UserUpdate, session: Session = Depends(get_session), current_user: TokenPayload = Depends(auth_controller.auth_service.get_current_user)):
+async def update_user(user_id: int, user_data: UserUpdate, session: Session = Depends(get_session), current_user: TokenPayload = Depends(RoleChecker(ALL_ROLES))):
     if current_user.id != user_id:
         raise PermissionError("Unauthorized access to update user data")
     

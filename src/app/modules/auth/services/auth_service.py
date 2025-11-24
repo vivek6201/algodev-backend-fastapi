@@ -7,8 +7,9 @@ from app.config.settings import settings
 from app.common.lib.formatter import TokenPayload
 from fastapi.security import OAuth2PasswordBearer
 from fastapi import Depends
+import secrets
 
-oauth_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth")
+oauth_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 class AuthService:
     def __init__(self):
         self.settings = settings
@@ -55,3 +56,7 @@ class AuthService:
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    
+    def generate_verification_token(self) -> str:
+        """Generate a secure random verification token"""
+        return secrets.token_urlsafe(32)

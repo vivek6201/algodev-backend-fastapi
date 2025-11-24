@@ -25,6 +25,11 @@ class Users(SQLModel, table=True):
     role: Role = pg_enum(Role, default=Role.USER, nullable=False)
 
     refresh_token: Optional[str] = Field(default=None, index=True)
+    
+    # Email verification
+    email_verified: bool = Field(default=False)
+    verification_token: Optional[str] = Field(default=None)
+    verification_token_expires: Optional[datetime] = Field(default=None)
 
     # Relationships
     posted_jobs: List["Job"] = Relationship(back_populates="owner")
