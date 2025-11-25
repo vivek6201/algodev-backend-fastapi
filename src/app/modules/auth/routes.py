@@ -26,13 +26,12 @@ async def refresh_token(request: Request, session: Session = Depends(get_session
     return auth_controller.refresh(session, request)
 
 
-@auth_router.post("/logout/{user_id}")
+@auth_router.delete("/logout")
 def logout(
-    user_id: int,
     session: Session = Depends(get_session),
     current_user: TokenPayload = Depends(RoleChecker(ALL_ROLES)),
 ):
-    return auth_controller.logout(user_id=user_id, session=session, current_user=current_user)
+    return auth_controller.logout(session=session, current_user=current_user)
 
 
 @auth_router.get("/verify-email/{token}")

@@ -17,6 +17,7 @@ class UserController:
             "username": user.username,
             "email": user.email,
             "role": user.role,
+            "name": f"{user.first_name} {user.last_name}",
             "created_at": user.created_at,
             "updated_at": user.updated_at,
         }
@@ -33,6 +34,7 @@ class UserController:
             "username": user.username,
             "email": user.email,
             "role": user.role,
+            "name": f"{user.first_name} {user.last_name}",
             "created_at": user.created_at,
             "updated_at": user.updated_at,
         }

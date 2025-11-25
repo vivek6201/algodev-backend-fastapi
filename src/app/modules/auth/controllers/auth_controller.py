@@ -64,9 +64,9 @@ class AuthController:
         print(f"\n{'=' * 60}")
         print(f"EMAIL VERIFICATION for {new_user.email}")
         print(f"{'=' * 60}")
-        print(f"Click this link to verify your email:")
-        print(f"  http://localhost:4001/api/auth/verify-email/{verification_token}")
-        print(f"Token expires: {verification_expires}")
+        print("Click this link to verify your email:")
+        print(f"  http://localhost:3000/verify-email?token={verification_token}")
+        print(f"  Token expires: {verification_expires}")
         print(f"{'=' * 60}\n")
 
         return SuccessResponse(
@@ -120,11 +120,8 @@ class AuthController:
             status_code=200,
         )
 
-    def logout(self, user_id: int, session: Session, current_user: TokenPayload):
-        if current_user.id != user_id:
-            return ErrorResponse(message="Unauthorized to logout this user", status_code=400)
-
-        user = self.user_service.get_user(session, user_id=user_id)
+    def logout(self, session: Session, current_user: TokenPayload):
+        user = self.user_service.get_user(session, user_id=current_user.id)
         if not user:
             return ErrorResponse(message="User not found", status_code=404)
 

@@ -11,16 +11,12 @@ user_router = APIRouter()
 user_controller = UserController()
 
 
-@user_router.get("/{user_id}")
+@user_router.get("/me")
 async def get_user(
-    user_id: int,
     session: Session = Depends(get_session),
     current_user: TokenPayload = Depends(RoleChecker(ALL_ROLES)),
 ):
-    if current_user.id != user_id:
-        raise PermissionError("Unauthorized access to user data")
-
-    user_data = user_controller.get_user(user_id=user_id, session=session)
+    user_data = user_controller.get_user(user_id=current_user.id, session=session)
 
     if not user_data:
         return ErrorResponse(message="User not found")
@@ -28,18 +24,14 @@ async def get_user(
     return SuccessResponse(data=user_data, message="User retrieved successfully")
 
 
-@user_router.put("/{user_id}")
+@user_router.put("/me")
 async def update_user(
-    user_id: int,
     user_data: UserUpdate,
     session: Session = Depends(get_session),
     current_user: TokenPayload = Depends(RoleChecker(ALL_ROLES)),
 ):
-    if current_user.id != user_id:
-        raise PermissionError("Unauthorized access to update user data")
-
     updated_user = user_controller.update_user(
-        user_id=user_id, user_data=user_data, session=session
+        user_id=current_user.id, user_data=user_data, session=session
     )
 
     if not updated_user:

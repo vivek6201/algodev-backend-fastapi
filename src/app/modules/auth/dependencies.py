@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, status
 from app.common.lib.formatter import TokenPayload
 from app.modules.auth.services.auth_service import AuthService, oauth_scheme, optional_oauth_scheme
 
-ALL_ROLES = ["ADMIN", "USER", "MODERATOR", "GUEST", "RECRUITER"]
+ALL_ROLES = ["ADMIN", "USER", "MODERATOR", "RECRUITER"]
 
 
 class RoleChecker:
