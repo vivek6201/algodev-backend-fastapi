@@ -3,16 +3,48 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from bcrypt import checkpw, gensalt, hashpw
-from fastapi import Depends
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
 from app.common.lib.formatter import TokenPayload
 from app.config.settings import settings
 
-oauth_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+class OAuth2PasswordBearerWithCookie(OAuth2PasswordBearer):
+    """Custom OAuth2 scheme that checks cookies first, then falls back to Authorization header"""
+
+    async def __call__(self, request: Request) -> Optional[str]:
+        # Check cookie first
+        token = request.cookies.get("access_token")
+        if token:
+            return token
+
+        # Fall back to Authorization header
+        return await super().__call__(request)
+
+
+class OptionalOAuth2PasswordBearerWithCookie(OAuth2PasswordBearer):
+    """Optional OAuth2 scheme that checks cookies first, returns None if no token found"""
+
+    async def __call__(self, request: Request) -> Optional[str]:
+        # Check cookie first
+        token = request.cookies.get("access_token")
+        if token:
+            return token
+
+        # Fall back to Authorization header
+        try:
+            return await super().__call__(request)
+        except HTTPException:
+            return None
+
+
+oauth_scheme = OAuth2PasswordBearerWithCookie(tokenUrl="/api/auth/login")
 # Optional OAuth scheme for public endpoints that work with or without authentication
-optional_oauth_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
+optional_oauth_scheme = OptionalOAuth2PasswordBearerWithCookie(
+    tokenUrl="/api/auth/login", auto_error=False
+)
 
 
 class AuthService:

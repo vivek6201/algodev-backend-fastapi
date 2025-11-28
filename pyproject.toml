@@ -16,7 +16,8 @@ dependencies = [
     "alembic",
     "python-jose",
     "bcrypt",
-    "python-multipart"
+    "python-multipart",
+    "python-slugify>=8.0.4",
 ]
 
 [project.optional-dependencies]

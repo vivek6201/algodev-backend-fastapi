@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Column, Field, ForeignKey, Relationship, SQLModel
 
 from app.common.db.utils import pg_enum
 
@@ -34,12 +34,15 @@ class ApplicationStatus(Enum):
 class JobCategoryLink(SQLModel, table=True):
     # Composite Primary Key (Both keys together are unique)
     job_id: Optional[int] = Field(default=None, foreign_key="job.id", primary_key=True)
-    category_id: Optional[int] = Field(default=None, foreign_key="category.id", primary_key=True)
+    category_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(ForeignKey("category.id", ondelete="CASCADE"), primary_key=True),
+    )
 
 
 class Category(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
-    name: str
+    name: str = Field(index=True, unique=True)
     jobs: List["Job"] = Relationship(back_populates="categories", link_model=JobCategoryLink)
 
 
@@ -74,8 +77,12 @@ class Job(JobBase, table=True):
 
     categories: List["Category"] = Relationship(back_populates="jobs", link_model=JobCategoryLink)
 
-    owner_id: int = Field(foreign_key="users.id")
+    owner_id: Optional[int] = Field(default=None, foreign_key="users.id")
     owner: Optional["Users"] = Relationship(back_populates="posted_jobs")  # noqa: F821
+
+    admin_id: Optional[int] = Field(default=None, foreign_key="admin.id")
+    admin: Optional["Admin"] = Relationship(back_populates="posted_jobs")  # noqa: F821
+
     company_name: Optional[str] = None
 
     company_id: Optional[int] = Field(default=None, foreign_key="company.id")

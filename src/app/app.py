@@ -13,6 +13,7 @@ from app.common.lib.exception_handlers import (
 from app.config.router import router
 from app.config.settings import settings
 from app.modules.jobs.models.jobs import *  # noqa: F403
+from app.modules.users.models.admin import *  # noqa: F403
 from app.modules.users.models.user import *  # noqa: F403
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)

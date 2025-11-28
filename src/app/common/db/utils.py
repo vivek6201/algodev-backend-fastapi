@@ -1,5 +1,6 @@
-from sqlmodel import Field
-from sqlmodel import Column, Enum as SAEnum
+from sqlmodel import Column, Field
+from sqlmodel import Enum as SAEnum
+
 
 def pg_enum(enum_cls, **kwargs):
     """
@@ -9,7 +10,7 @@ def pg_enum(enum_cls, **kwargs):
     return Field(
         sa_column=Column(
             # We auto-generate the name here using enum_cls.__name__
-            SAEnum(enum_cls, name=enum_cls.__name__.lower()), 
-            **kwargs
+            SAEnum(enum_cls, name=enum_cls.__name__.lower()),
+            **kwargs,
         )
     )

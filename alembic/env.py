@@ -13,6 +13,7 @@ from app.config.settings import settings
 from app.common.db.config import engine
 import sqlmodel
 from app.modules.users.models.user import *
+from app.modules.users.models.admin import *
 from app.modules.jobs.models.jobs import *
 
 # this is the Alembic Config object

@@ -111,14 +111,36 @@ class AuthController:
         if user.id is not None:
             self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
 
-        return SuccessResponse(
+        # Create response object
+        response = SuccessResponse(
             message="Login successful",
             data={
-                "access_token": access_token,
-                "refresh_token": refresh_token,
+                "id": user.id,
+                "email": user.email,
+                "role": user.role,
             },
             status_code=200,
         )
+
+        # Set tokens in HTTP-only cookies
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=3600,  # 1 hour (adjust based on your token expiry)
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=True,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=604800,  # 7 days (adjust based on your token expiry)
+        )
+
+        return response
 
     def logout(self, session: Session, current_user: TokenPayload):
         user = self.user_service.get_user(session, user_id=current_user.id)
@@ -128,9 +150,16 @@ class AuthController:
         if user.id is not None:
             self.user_service.update_user(user.id, {"refresh_token": None}, session)
 
-        return SuccessResponse(
+        # Create response object
+        response = SuccessResponse(
             message="Logout successful",
         )
+
+        # Clear cookies
+        response.delete_cookie(key="access_token")
+        response.delete_cookie(key="refresh_token")
+
+        return response
 
     def verify_email(self, token: str, session: Session):
         """Verify user email using verification token"""
@@ -163,8 +192,11 @@ class AuthController:
     def refresh(self, session: Session, request: Request):
         """Refresh access and refresh tokens using a valid refresh token"""
 
-        # check whether it comes in headers or cookies (V.V.IMP)
-        refresh_token = request.headers.get("refresh_token")
+        # Check cookies first, then fall back to headers
+        refresh_token = request.cookies.get("refresh_token")
+        if not refresh_token:
+            refresh_token = request.headers.get("refresh_token")
+
         if not refresh_token:
             return ErrorResponse(message="Refresh token is missing", status_code=400)
 
@@ -202,12 +234,35 @@ class AuthController:
         # Update refresh token in database
         self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
 
-        # Return new tokens
-        return SuccessResponse(
+        # Create response object
+        response = SuccessResponse(
             message="Token refreshed successfully",
             data={
-                "access_token": access_token,
-                "refresh_token": refresh_token,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "role": user.role,
+                }
             },
             status_code=200,
         )
+
+        # Set new tokens in HTTP-only cookies
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=3600,  # 1 hour
+        )
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+            max_age=604800,  # 7 days
+        )
+
+        return response

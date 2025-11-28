@@ -7,32 +7,26 @@ from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 from app.common.db.utils import pg_enum
 
 
-class Role(str, Enum):
-    """User role enumeration"""
+class AdminRole(str, Enum):
+    """Admin role enumeration"""
 
-    CANDIDATE = "CANDIDATE"
-    RECRUITER = "RECRUITER"
+    ADMIN = "ADMIN"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    MODERATOR = "MODERATOR"
 
 
-class Users(SQLModel, table=True):
+class Admin(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
     first_name: str
     last_name: str
     email: str = Field(index=True, unique=True)
-    username: str = Field(index=True, unique=True)
     password: str
-    role: Role = pg_enum(Role, default=Role.CANDIDATE, nullable=False)
+    role: AdminRole = pg_enum(AdminRole, default=AdminRole.ADMIN, nullable=False)
 
     refresh_token: Optional[str] = Field(default=None, index=True)
 
-    # Email verification
-    email_verified: bool = Field(default=False)
-    verification_token: Optional[str] = Field(default=None)
-    verification_token_expires: Optional[datetime] = Field(default=None)
-
     # Relationships
-    posted_jobs: List["Job"] = Relationship(back_populates="owner")  # noqa: F821
-    applications: List["JobApplication"] = Relationship(back_populates="candidate")  # noqa: F821
+    posted_jobs: List["Job"] = Relationship(back_populates="admin")  # noqa: F821
 
     # timestamp fields
     created_at: datetime = Field(

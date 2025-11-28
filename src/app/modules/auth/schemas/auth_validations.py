@@ -34,3 +34,8 @@ class Signup(BaseModel):
 
 class VerifyEmail(BaseModel):
     token: str
+
+
+class AdminLogin(BaseModel):
+    email: str
+    password: str

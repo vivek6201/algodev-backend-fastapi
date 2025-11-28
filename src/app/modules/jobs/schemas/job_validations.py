@@ -10,6 +10,7 @@ class JobCreateBase(JobBase):
     category_id: List[int]
     min_salary: int
     max_salary: int
+    slug: str | None = None
 
 
 class JobUpdateBase(BaseModel):
