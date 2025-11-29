@@ -2,7 +2,9 @@ from bcrypt import gensalt, hashpw
 from sqlmodel import Session, select
 
 from app.common.db.config import engine
+from app.modules.jobs.models.jobs import *  # noqa: F403
 from app.modules.users.models.admin import Admin, AdminRole
+from app.modules.users.models.user import *  # noqa: F403
 
 
 def create_admin_user():

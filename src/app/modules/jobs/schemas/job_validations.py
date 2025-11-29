@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -68,9 +68,10 @@ class JobResponse(BaseModel):
     max_salary: int | None = None
     listing_type: ListingType
     external_apply_url: str | None = None
-    owner_id: int
+    admin_id: Optional[int] = None
+    owner_id: Optional[int] = None
     company_name: str | None = None
-    company_id: int | None = None
+    company_id: Optional[int] = None
     status: JobStatus
     categories: List[CategoryInJob] = []
     created_at: datetime

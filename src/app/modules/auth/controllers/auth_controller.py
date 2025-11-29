@@ -4,6 +4,7 @@ from fastapi import Request
 from sqlmodel import Session
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
+from app.config.settings import settings
 from app.modules.auth.schemas.auth_validations import Login, Signup
 from app.modules.auth.services.auth_service import AuthService
 from app.modules.users.services.user_service import UserService
@@ -97,7 +98,7 @@ class AuthController:
         if not user.email_verified:
             return ErrorResponse(
                 message="Email not verified. Please verify your email before logging in.",
-                status_code=403,
+                status_code=400,
             )
 
         if user.id is None:
@@ -127,17 +128,21 @@ class AuthController:
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,  # Set to True in production with HTTPS
+            secure=not settings.DEBUG,
             samesite="lax",
-            max_age=3600,  # 1 hour (adjust based on your token expiry)
+            domain=settings.DOMAIN,
+            path="/",
+            max_age=3600,
         )
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,  # Set to True in production with HTTPS
+            secure=not settings.DEBUG,
             samesite="lax",
-            max_age=604800,  # 7 days (adjust based on your token expiry)
+            domain=settings.DOMAIN,
+            path="/",
+            max_age=604800,
         )
 
         return response
@@ -252,7 +257,7 @@ class AuthController:
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=True,
+            secure=not settings.DEBUG,
             samesite="lax",
             max_age=3600,  # 1 hour
         )
@@ -260,7 +265,7 @@ class AuthController:
             key="refresh_token",
             value=refresh_token,
             httponly=True,
-            secure=True,
+            secure=not settings.DEBUG,
             samesite="lax",
             max_age=604800,  # 7 days
         )

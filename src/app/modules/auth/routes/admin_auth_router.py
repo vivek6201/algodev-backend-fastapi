@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
 from app.common.db.config import get_session
@@ -22,3 +22,11 @@ def admin_logout(
     current_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
 ):
     return admin_auth_controller.admin_logout(session, current_admin)
+
+
+@admin_auth_router.post("/refresh")
+def refresh_admin_token(
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    return admin_auth_controller.refresh_admin_token(session, request)

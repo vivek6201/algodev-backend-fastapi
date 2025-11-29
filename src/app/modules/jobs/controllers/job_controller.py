@@ -1,5 +1,8 @@
+from typing import Optional
+
 from sqlmodel import Session
 
+from app.common.lib.formatter import SuccessResponse
 from app.modules.jobs.models.jobs import JobStatus, ListingType
 from app.modules.jobs.services.base_job_service import BaseJobService
 
@@ -14,10 +17,13 @@ class JobController:
         status: JobStatus,
         type: ListingType | None = None,
     ):
-        return self.job_service.list_jobs(session, type, status)
+        jobs = self.job_service.list_jobs(session, type, status)
+        return SuccessResponse(message="Jobs fetched successfully", data=jobs)
 
-    def get_job(self, session: Session, job_slug: str, status: JobStatus):
-        return self.job_service.get_job(session, job_slug, status)
+    def get_job(self, session: Session, job_slug: str, status: Optional[JobStatus] = None):
+        job = self.job_service.get_job(session, job_slug, status)
+        return SuccessResponse(message="Job fetched successfully", data=job)
 
-    def get_categories(self, session: Session):
-        return self.job_service.get_all_categories(session)
+    def get_categories(self, session: Session, query: str | None = None):
+        categories = self.job_service.get_all_categories(session, query)
+        return SuccessResponse(message="Categories fetched successfully", data=categories)

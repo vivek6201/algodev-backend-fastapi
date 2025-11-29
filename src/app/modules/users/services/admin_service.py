@@ -9,13 +9,17 @@ from app.modules.users.schemas.admin_validations import AdminCreate
 
 class AdminService:
     def get_admin(
-        self, session: Session, admin_id: Optional[int] = None, email: Optional[str] = None
+        self,
+        session: Session,
+        admin_id: Optional[int] = None,
+        email: Optional[str] = None,
     ):
         if admin_id:
             return session.get(Admin, admin_id)
         if email:
             statement = select(Admin).where(Admin.email == email)
-            return session.exec(statement).first()
+            admin = session.exec(statement).first()
+            return admin
         return None
 
     def create_admin(self, admin_data: AdminCreate, session: Session):

@@ -6,7 +6,11 @@ from sqlmodel import Session, select
 from app.common.lib.formatter import TokenPayload
 from app.modules.jobs.models.jobs import Category, Job
 from app.modules.jobs.schemas.category_validations import CategoryCreate, CategoryUpdate
-from app.modules.jobs.schemas.job_validations import ThirdPartyJobCreate, ThirdPartyJobUpdate
+from app.modules.jobs.schemas.job_validations import (
+    JobResponse,
+    ThirdPartyJobCreate,
+    ThirdPartyJobUpdate,
+)
 from app.modules.jobs.services.base_job_service import BaseJobService
 
 
@@ -49,7 +53,7 @@ class AdminJobService(BaseJobService):
             unique_suffix = str(uuid4().hex)[:6]
             job_data.slug = f"{base_slug}-{unique_suffix}"
 
-        job = self.get_job(session=session, job_slug=job_data.slug, status=None)
+        job = self.get_job_instance(session=session, job_slug=job_data.slug, status=None)
         if job:
             return None
 
@@ -76,12 +80,12 @@ class AdminJobService(BaseJobService):
         job_slug: str,
         job_data: ThirdPartyJobUpdate,
     ):
-        job = self.get_job(session=session, job_slug=job_slug, status=None)
+        job = self.get_job_instance(session=session, job_slug=job_slug, status=None)
         if not job:
             return None
 
         try:
-            job_dict = job_data.model_dump(exclude={"category_id"})
+            job_dict = job_data.model_dump(exclude={"category_id", "slug"})
 
             for key, value in job_dict.items():
                 setattr(job, key, value)
@@ -91,14 +95,14 @@ class AdminJobService(BaseJobService):
                 new_categories = session.exec(
                     select(Category).where(Category.id.in_(job_data.category_id))
                 ).all()
-                # Unlink old categories and link new ones
+
                 job.categories.clear()
                 job.categories.extend(new_categories)
 
             session.add(job)
             session.commit()
             session.refresh(job)
-            return job
+            return JobResponse.model_validate(job)
         except Exception as e:
             session.rollback()
             raise e

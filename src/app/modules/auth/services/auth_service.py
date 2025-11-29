@@ -5,7 +5,7 @@ from typing import Optional
 from bcrypt import checkpw, gensalt, hashpw
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 
 from app.common.lib.formatter import TokenPayload
 from app.config.settings import settings
@@ -41,6 +41,7 @@ class OptionalOAuth2PasswordBearerWithCookie(OAuth2PasswordBearer):
 
 
 oauth_scheme = OAuth2PasswordBearerWithCookie(tokenUrl="/api/auth/login")
+
 # Optional OAuth scheme for public endpoints that work with or without authentication
 optional_oauth_scheme = OptionalOAuth2PasswordBearerWithCookie(
     tokenUrl="/api/auth/login", auto_error=False
@@ -95,8 +96,10 @@ class AuthService:
                 token, self.settings.SECRET_KEY, algorithms=[self.settings.ALGORITHM]
             )
             return payload
+        except ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token has expired")
         except JWTError:
-            raise JWTError("Could not validate credentials")
+            raise HTTPException(status_code=401, detail="Could not validate credentials")
 
     def hash_password(self, password: str) -> str:
         return hashpw(password.encode("utf-8"), gensalt()).decode("utf-8")

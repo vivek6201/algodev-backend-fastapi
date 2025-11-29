@@ -24,5 +24,6 @@ def get_job(job_slug: str, session: Session = Depends(get_session)):
 
 
 @normal_job_router.get("/categories")
-def get_categories(session: Session = Depends(get_session)):
-    return job_controller.get_categories(session)
+def get_categories(req: Request, session: Session = Depends(get_session)):
+    query: str | None = req.query_params.get("query")
+    return job_controller.get_categories(session, query)
