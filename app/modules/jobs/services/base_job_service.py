@@ -12,16 +12,12 @@ class BaseJobService:
         status: JobStatus,
         type: ListingType | None = None,
     ):
-        try:
-            query = select(Job)
-            if status:
-                query = query.where(Job.status == status)
-            if type:
-                query = query.where(Job.listing_type == type)
-            return session.exec(query).all()
-        except Exception as e:
-            print(e)
-            return None
+        query = select(Job)
+        if status:
+            query = query.where(Job.status == status)
+        if type:
+            query = query.where(Job.listing_type == type)
+        return session.exec(query).all()
 
     def get_job_instance(
         self, session: Session, job_slug: str, status: JobStatus | None = None

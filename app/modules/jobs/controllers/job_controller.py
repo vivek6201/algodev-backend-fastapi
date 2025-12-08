@@ -17,8 +17,11 @@ class JobController:
         status: JobStatus,
         type: ListingType | None = None,
     ):
-        jobs = self.job_service.list_jobs(session, type, status)
-        return SuccessResponse(message="Jobs fetched successfully", data=jobs)
+        try:
+            jobs = self.job_service.list_jobs(session=session, status=status, type=type)
+            return SuccessResponse(message="Jobs fetched successfully", data=jobs)
+        except Exception as e:
+            return e
 
     def get_job(self, session: Session, job_slug: str, status: Optional[JobStatus] = None):
         job = self.job_service.get_job(session, job_slug, status)

@@ -14,7 +14,7 @@ job_controller = JobController()
 @normal_job_router.get("/")
 def list_jobs(req: Request, session: Session = Depends(get_session)):
     type: ListingType | None = req.query_params.get("type")
-    return job_controller.list_jobs(session, type, status=JobStatus.PUBLISHED)
+    return job_controller.list_jobs(session, type=type, status=JobStatus.PUBLISHED)
 
 
 @normal_job_router.get("/one/{job_slug}")
