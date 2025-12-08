@@ -2,6 +2,7 @@ from typing import Union
 
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
 
 from .formatter import ErrorResponse
 
@@ -38,9 +39,15 @@ async def general_exception_handler(request: Request, exc: Exception) -> ErrorRe
     else:
         error_details.append({"error": str(exc)})
 
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    message = "An unexpected error occurred"
+
+    if isinstance(exc, HTTPException):
+        status_code = exc.status_code
+        message = exc.detail
+
     return ErrorResponse(
-        message="An unexpected error occurred",
-        success=False,
+        message=message,
         error=error_details,
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=status_code,
     )
