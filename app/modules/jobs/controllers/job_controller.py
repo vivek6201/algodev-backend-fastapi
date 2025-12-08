@@ -14,7 +14,7 @@ class JobController:
     def list_jobs(
         self,
         session: Session,
-        status: JobStatus,
+        status: Optional[JobStatus] = None,
         type: ListingType | None = None,
     ):
         try:

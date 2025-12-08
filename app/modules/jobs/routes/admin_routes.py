@@ -24,12 +24,12 @@ def list_jobs(
     ),
 ):
     type: ListingType | None = req.query_params.get("type")
-    return job_controller.list_jobs(session, type)
+    return job_controller.list_jobs(session=session, type=type)
 
 
 @admin_job_router.get("/one/{job_slug}")
 def get_job(job_slug: str, session: Session = Depends(get_session)):
-    return job_controller.get_job(session, job_slug)
+    return job_controller.get_job(session=session, job_slug=job_slug)
 
 
 @admin_job_router.post("/category")
@@ -40,7 +40,9 @@ def create_category(
         RoleChecker(allowed_roles=ALL_ADMIN_ROLES, user_type="admin")
     ),
 ):
-    return job_controller.create_category(session, category_data, current_admin)
+    return job_controller.create_category(
+        session=session, category_data=category_data, current_admin=current_admin
+    )
 
 
 @admin_job_router.patch("/category/{category_id}")
@@ -52,7 +54,12 @@ def update_category(
         RoleChecker(allowed_roles=ALL_ADMIN_ROLES, user_type="admin")
     ),
 ):
-    return job_controller.update_category(session, category_id, category_data, current_admin)
+    return job_controller.update_category(
+        session=session,
+        category_id=category_id,
+        category_data=category_data,
+        current_admin=current_admin,
+    )
 
 
 @admin_job_router.post("/job_create")
@@ -63,7 +70,9 @@ def create_job(
         RoleChecker(allowed_roles=ALL_ADMIN_ROLES, user_type="admin")
     ),
 ):
-    return job_controller.create_job(session, job_data, current_admin)
+    return job_controller.create_job(
+        session=session, job_data=job_data, current_admin=current_admin
+    )
 
 
 @admin_job_router.patch("/job_update/{job_slug}")
@@ -75,4 +84,6 @@ def update_job(
         RoleChecker(allowed_roles=ALL_ADMIN_ROLES, user_type="admin")
     ),
 ):
-    return job_controller.update_job(session, job_slug, job_data, current_admin)
+    return job_controller.update_job(
+        session=session, job_slug=job_slug, job_data=job_data, current_admin=current_admin
+    )

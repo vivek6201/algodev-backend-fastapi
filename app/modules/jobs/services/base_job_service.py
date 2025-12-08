@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy.orm.strategy_options import selectinload
 from sqlmodel import Session, select
 
@@ -9,7 +11,7 @@ class BaseJobService:
     def list_jobs(
         self,
         session: Session,
-        status: JobStatus,
+        status: Optional[JobStatus] = None,
         type: ListingType | None = None,
     ):
         query = select(Job)
