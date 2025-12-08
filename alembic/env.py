@@ -2,11 +2,9 @@ from logging.config import fileConfig
 from alembic import context
 import sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from alembic.autogenerate import renderers
 from sqlalchemy.dialects.postgresql import ENUM
-
-# Add src to path FIRST, before any app imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # NOW import app modules
 from app.config.settings import settings

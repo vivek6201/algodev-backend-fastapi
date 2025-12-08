@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
 
     # CORS
-    ALLOWED_HOSTS: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+    TRUSTED_HOSTS: list[str] = ["localhost", "127.0.0.1", "::1"]
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="allow"
