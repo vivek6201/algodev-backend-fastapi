@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
-from app.modules.jobs.models.jobs import JobBase, JobStatus, JobType, ListingType
+from app.modules.jobs.models.jobs import JobBase, JobMode, JobStatus, JobType, ListingType
 
 
 class JobCreateBase(JobBase):
@@ -21,6 +21,7 @@ class JobUpdateBase(BaseModel):
     max_salary: int | None = None
     slug: str | None = None
     job_type: JobType | None = None
+    job_mode: JobMode | None = None
     category_id: List[int] | None = None
 
 
@@ -64,6 +65,7 @@ class JobResponse(BaseModel):
     description: str
     location: str
     job_type: JobType
+    job_mode: JobMode
     min_salary: int | None = None
     max_salary: int | None = None
     listing_type: ListingType

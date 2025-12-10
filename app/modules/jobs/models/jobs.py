@@ -14,6 +14,12 @@ class JobType(Enum):
     INTERN = "INTERN"
 
 
+class JobMode(Enum):
+    REMOTE = "REMOTE"
+    ON_SITE = "ON_SITE"
+    HYBRID = "HYBRID"
+
+
 class JobStatus(Enum):
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
@@ -63,10 +69,11 @@ class JobBase(SQLModel):
     slug: str = Field(index=True, unique=True)
     description: str
     location: str
-    job_type: JobType = pg_enum(JobType)
+    job_type: JobType = pg_enum(JobType, nullable=False)
+    job_mode: JobMode = pg_enum(JobMode, nullable=False)
     min_salary: Optional[int] = None
     max_salary: Optional[int] = None
-    listing_type: ListingType = pg_enum(ListingType)
+    listing_type: ListingType = pg_enum(ListingType, nullable=False)
 
 
 class Job(JobBase, table=True):

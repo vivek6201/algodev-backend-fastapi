@@ -62,3 +62,4 @@ asyncio_mode = "auto"
 
 [project.scripts]
 start = "app.server:main"
+dev = "app.server:dev"

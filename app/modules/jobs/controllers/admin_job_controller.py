@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlmodel import Session
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
@@ -22,18 +23,23 @@ class AdminJobController(JobController):
         category_data: CategoryCreate,
         current_admin: TokenPayload,
     ):
-        admin = session.get(Admin, current_admin.id)
-        if not admin:
-            return ErrorResponse(message="Admin not found", status_code=404)
+        try:
+            admin = session.get(Admin, current_admin.id)
+            if not admin:
+                return ErrorResponse(message="Admin not found", status_code=404)
 
-        new_category = self.job_service.create_category(session, category_data)
+            new_category = self.job_service.create_category(session, category_data)
 
-        if not new_category:
-            return ErrorResponse(message="Category with this name already exists", status_code=400)
+            if not new_category:
+                return ErrorResponse(
+                    message="Category with this name already exists", status_code=400
+                )
 
-        return SuccessResponse(
-            message="Category created successfully", data=new_category, status_code=201
-        )
+            return SuccessResponse(
+                message="Category created successfully", data=new_category, status_code=201
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     def update_category(
         self,
@@ -42,20 +48,23 @@ class AdminJobController(JobController):
         category_data: CategoryUpdate,
         current_admin: TokenPayload,
     ):
-        admin = session.get(Admin, current_admin.id)
-        if not admin:
-            return ErrorResponse(message="Admin not found", status_code=404)
+        try:
+            admin = session.get(Admin, current_admin.id)
+            if not admin:
+                return ErrorResponse(message="Admin not found", status_code=404)
 
-        updated_category = self.job_service.update_category(
-            session, category_id, category_data, admin
-        )
+            updated_category = self.job_service.update_category(
+                session, category_id, category_data, admin
+            )
 
-        if not updated_category:
-            return ErrorResponse(message="Category not found", status_code=404)
+            if not updated_category:
+                return ErrorResponse(message="Category not found", status_code=404)
 
-        return SuccessResponse(
-            message="Category updated successfully", data=updated_category, status_code=200
-        )
+            return SuccessResponse(
+                message="Category updated successfully", data=updated_category, status_code=200
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     def create_job(
         self,
@@ -63,16 +72,21 @@ class AdminJobController(JobController):
         job_data: ThirdPartyJobCreate,
         current_admin: TokenPayload,
     ):
-        admin = session.get(Admin, current_admin.id)
-        if not admin:
-            return ErrorResponse(message="Admin not found", status_code=404)
+        try:
+            admin = session.get(Admin, current_admin.id)
+            if not admin:
+                return ErrorResponse(message="Admin not found", status_code=404)
 
-        new_job = self.job_service.create_job(session, job_data, admin)
+            new_job = self.job_service.create_job(session, job_data, admin)
 
-        if not new_job:
-            return ErrorResponse(message="Job with this title already exists", status_code=400)
+            if not new_job:
+                return ErrorResponse(message="Job with this title already exists", status_code=400)
 
-        return SuccessResponse(message="Job created successfully", data=new_job, status_code=201)
+            return SuccessResponse(
+                message="Job created successfully", data=new_job, status_code=201
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     def update_job(
         self,
@@ -81,17 +95,20 @@ class AdminJobController(JobController):
         job_data: ThirdPartyJobUpdate,
         current_admin: TokenPayload,
     ):
-        admin = session.get(Admin, current_admin.id)
-        if not admin:
-            return ErrorResponse(message="Admin not found", status_code=404)
+        try:
+            admin = session.get(Admin, current_admin.id)
+            if not admin:
+                return ErrorResponse(message="Admin not found", status_code=404)
 
-        updated_job = self.job_service.update_job(session, job_slug, job_data)
+            updated_job = self.job_service.update_job(session, job_slug, job_data)
 
-        if not updated_job:
-            return ErrorResponse(message="Job not found", status_code=404)
+            if not updated_job:
+                return ErrorResponse(message="Job not found", status_code=404)
 
-        updated_job = JobResponse.model_validate(updated_job)
+            updated_job = JobResponse.model_validate(updated_job)
 
-        return SuccessResponse(
-            message="Job updated successfully", data=updated_job, status_code=200
-        )
+            return SuccessResponse(
+                message="Job updated successfully", data=updated_job, status_code=200
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))

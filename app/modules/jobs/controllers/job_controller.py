@@ -1,5 +1,6 @@
 from typing import Optional
 
+from fastapi import HTTPException
 from sqlmodel import Session
 
 from app.common.lib.formatter import SuccessResponse
@@ -21,12 +22,18 @@ class JobController:
             jobs = self.job_service.list_jobs(session=session, status=status, type=type)
             return SuccessResponse(message="Jobs fetched successfully", data=jobs)
         except Exception as e:
-            return e
+            raise HTTPException(status_code=500, detail=str(e))
 
     def get_job(self, session: Session, job_slug: str, status: Optional[JobStatus] = None):
-        job = self.job_service.get_job(session, job_slug, status)
-        return SuccessResponse(message="Job fetched successfully", data=job)
+        try:
+            job = self.job_service.get_job(session, job_slug, status)
+            return SuccessResponse(message="Job fetched successfully", data=job)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     def get_categories(self, session: Session, query: str | None = None):
-        categories = self.job_service.get_all_categories(session, query)
-        return SuccessResponse(message="Categories fetched successfully", data=categories)
+        try:
+            categories = self.job_service.get_all_categories(session, query)
+            return SuccessResponse(message="Categories fetched successfully", data=categories)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
