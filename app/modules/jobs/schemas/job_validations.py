@@ -14,15 +14,20 @@ class JobCreateBase(JobBase):
 
 
 class JobUpdateBase(BaseModel):
-    title: str | None = None
-    description: str | None = None
-    location: str | None = None
-    min_salary: int | None = None
-    max_salary: int | None = None
-    slug: str | None = None
-    job_type: JobType | None = None
-    job_mode: JobMode | None = None
-    category_id: List[int] | None = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    location: Optional[str] = None
+    min_salary: Optional[int] = None
+    max_salary: Optional[int] = None
+    slug: Optional[str] = None
+    job_type: Optional[JobType] = None
+    job_mode: Optional[JobMode] = None
+    category_id: Optional[List[int]] = None
+    status: Optional[JobStatus] = None
+
+
+class JobStatusUpdate(BaseModel):
+    status: JobStatus
 
 
 class ThirdPartyJobCreate(JobCreateBase):
@@ -32,8 +37,8 @@ class ThirdPartyJobCreate(JobCreateBase):
 
 
 class ThirdPartyJobUpdate(JobUpdateBase):
-    external_apply_url: str | None = None
-    company_name: str | None = None
+    external_apply_url: Optional[str] = None
+    company_name: Optional[str] = None
 
 
 class DirectJobCreate(JobCreateBase):
@@ -42,7 +47,7 @@ class DirectJobCreate(JobCreateBase):
 
 
 class DirectJobUpdate(JobUpdateBase):
-    company_id: int | None = None
+    company_id: Optional[int] = None
 
 
 # Response schemas
@@ -66,15 +71,15 @@ class JobResponse(BaseModel):
     location: str
     job_type: JobType
     job_mode: JobMode
-    min_salary: int | None = None
-    max_salary: int | None = None
+    min_salary: Optional[int] = None
+    max_salary: Optional[int] = None
     listing_type: ListingType
-    external_apply_url: str | None = None
+    external_apply_url: Optional[str] = None
     admin_id: Optional[int] = None
     owner_id: Optional[int] = None
-    company_name: str | None = None
+    company_name: Optional[str] = None
     company_id: Optional[int] = None
-    status: JobStatus
+    status: Optional[JobStatus] = None
     categories: List[CategoryInJob] = []
     created_at: datetime
     updated_at: datetime

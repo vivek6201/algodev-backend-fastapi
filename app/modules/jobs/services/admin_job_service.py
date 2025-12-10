@@ -4,7 +4,7 @@ from slugify import slugify
 from sqlmodel import Session, select
 
 from app.common.lib.formatter import TokenPayload
-from app.modules.jobs.models.jobs import Category, Job
+from app.modules.jobs.models.jobs import Category, Job, JobStatus
 from app.modules.jobs.schemas.category_validations import CategoryCreate, CategoryUpdate
 from app.modules.jobs.schemas.job_validations import (
     JobResponse,
@@ -103,6 +103,32 @@ class AdminJobService(BaseJobService):
             session.commit()
             session.refresh(job)
             return JobResponse.model_validate(job)
+        except Exception as e:
+            session.rollback()
+            raise e
+
+    def update_job_status(
+        self,
+        session: Session,
+        job_slug: str,
+        status: JobStatus,
+    ):
+        job = self.get_job_instance(session=session, job_slug=job_slug, status=None)
+        if not job:
+            return {
+                "status": False,
+                "message": "Job not found",
+            }
+
+        try:
+            job.status = status
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+            return {
+                "status": True,
+                "message": "Job status updated successfully",
+            }
         except Exception as e:
             session.rollback()
             raise e

@@ -6,9 +6,12 @@ from app.common.db.config import get_session
 from app.common.lib.formatter import TokenPayload
 from app.modules.auth.dependencies import ALL_ADMIN_ROLES, RoleChecker
 from app.modules.jobs.controllers.admin_job_controller import AdminJobController
-from app.modules.jobs.models.jobs import ListingType
 from app.modules.jobs.schemas.category_validations import CategoryCreate, CategoryUpdate
-from app.modules.jobs.schemas.job_validations import ThirdPartyJobCreate, ThirdPartyJobUpdate
+from app.modules.jobs.schemas.job_validations import (
+    JobStatusUpdate,
+    ThirdPartyJobCreate,
+    ThirdPartyJobUpdate,
+)
 
 job_controller = AdminJobController()
 
@@ -23,12 +26,27 @@ def list_jobs(
         RoleChecker(allowed_roles=ALL_ADMIN_ROLES, user_type="admin")
     ),
 ):
-    type: ListingType | None = req.query_params.get("type")
-    return job_controller.list_jobs(session=session, type=type)
+    page = req.query_params.get("page")
+    limit = req.query_params.get("limit")
+
+    params = {
+        "type": req.query_params.get("type"),
+        "page": int(page) if page else 1,
+        "limit": int(limit) if limit else 10,
+        "search": req.query_params.get("search"),
+        "status": req.query_params.get("status"),
+    }
+    return job_controller.list_jobs(session=session, **params)
 
 
 @admin_job_router.get("/one/{job_slug}")
-def get_job(job_slug: str, session: Session = Depends(get_session)):
+def get_job(
+    job_slug: str,
+    session: Session = Depends(get_session),
+    current_admin: TokenPayload = Depends(
+        RoleChecker(allowed_roles=ALL_ADMIN_ROLES, user_type="admin")
+    ),
+):
     return job_controller.get_job(session=session, job_slug=job_slug)
 
 
@@ -86,4 +104,18 @@ def update_job(
 ):
     return job_controller.update_job(
         session=session, job_slug=job_slug, job_data=job_data, current_admin=current_admin
+    )
+
+
+@admin_job_router.patch("/change_status/{job_slug}")
+def publish_job(
+    job_slug: str,
+    status_data: JobStatusUpdate,
+    session: Session = Depends(get_session),
+    current_admin: TokenPayload = Depends(
+        RoleChecker(allowed_roles=ALL_ADMIN_ROLES, user_type="admin")
+    ),
+):
+    return job_controller.update_job_status(
+        session=session, job_slug=job_slug, status=status_data.status, current_admin=current_admin
     )

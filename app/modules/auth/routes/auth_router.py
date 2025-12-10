@@ -23,7 +23,7 @@ def signup(body: Signup, session: Session = Depends(get_session)):
     return auth_controller.signup(body, session)
 
 
-@auth_router.post("/refresh-token")
+@auth_router.post("/refresh")
 async def refresh_token(request: Request, session: Session = Depends(get_session)):
     return auth_controller.refresh(session, request)
 

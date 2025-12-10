@@ -1,7 +1,8 @@
+import math
 from typing import Optional
 
 from sqlalchemy.orm.strategy_options import selectinload
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from app.modules.jobs.models.jobs import Category, Job, JobStatus, ListingType
 from app.modules.jobs.schemas.job_validations import JobResponse
@@ -11,15 +12,37 @@ class BaseJobService:
     def list_jobs(
         self,
         session: Session,
+        page: int,
+        limit: int,
         status: Optional[JobStatus] = None,
         type: ListingType | None = None,
+        search: Optional[str] = None,
     ):
         query = select(Job)
+        count_query = select(func.count()).select_from(Job)
+
         if status:
             query = query.where(Job.status == status)
+            count_query = count_query.where(Job.status == status)
         if type:
             query = query.where(Job.listing_type == type)
-        return session.exec(query).all()
+            count_query = count_query.where(Job.listing_type == type)
+        if search:
+            search = search.strip()
+            query = query.where(Job.title.ilike(f"%{search}%"))
+            count_query = count_query.where(Job.title.ilike(f"%{search}%"))
+
+        total_items = session.exec(count_query).one()
+        total_pages = math.ceil(total_items / limit) if limit > 0 else 1
+
+        if page:
+            query = query.offset((page - 1) * limit).limit(limit)
+
+        return {
+            "jobs": session.exec(query).all(),
+            "total_items": total_items,
+            "total_pages": total_pages,
+        }
 
     def get_job_instance(
         self, session: Session, job_slug: str, status: JobStatus | None = None

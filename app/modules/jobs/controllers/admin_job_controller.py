@@ -3,6 +3,7 @@ from sqlmodel import Session
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
 from app.modules.jobs.controllers.job_controller import JobController
+from app.modules.jobs.models.jobs import JobStatus
 from app.modules.jobs.schemas.category_validations import CategoryCreate, CategoryUpdate
 from app.modules.jobs.schemas.job_validations import (
     JobResponse,
@@ -110,5 +111,26 @@ class AdminJobController(JobController):
             return SuccessResponse(
                 message="Job updated successfully", data=updated_job, status_code=200
             )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    def update_job_status(
+        self,
+        session: Session,
+        job_slug: str,
+        status: JobStatus,
+        current_admin: TokenPayload,
+    ):
+        try:
+            admin = session.get(Admin, current_admin.id)
+            if not admin:
+                return ErrorResponse(message="Admin not found", status_code=404)
+
+            result = self.job_service.update_job_status(session, job_slug, status)
+
+            if not result["status"]:
+                return ErrorResponse(message=result["message"], status_code=400)
+
+            return SuccessResponse(message=result["message"], status_code=200)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

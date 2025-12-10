@@ -15,12 +15,34 @@ class JobController:
     def list_jobs(
         self,
         session: Session,
+        page: int,
+        limit: int,
+        search: Optional[str] = None,
         status: Optional[JobStatus] = None,
-        type: ListingType | None = None,
+        type: Optional[ListingType] = None,
     ):
         try:
-            jobs = self.job_service.list_jobs(session=session, status=status, type=type)
-            return SuccessResponse(message="Jobs fetched successfully", data=jobs)
+            params = {
+                "session": session,
+                "status": status,
+                "type": type,
+                "page": page,
+                "limit": limit,
+                "search": search,
+            }
+
+            result = self.job_service.list_jobs(**params)
+
+            return SuccessResponse(
+                message="Jobs fetched successfully",
+                data={
+                    "data": result["jobs"],
+                    "page": page,
+                    "limit": limit,
+                    "total_items": result["total_items"],
+                    "total_pages": result["total_pages"],
+                },
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
