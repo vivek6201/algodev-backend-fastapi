@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from fastapi import Request
 from sqlmodel import Session
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
+from app.config.email import send_mail
 from app.config.settings import settings
 from app.modules.auth.schemas.auth_validations import Login, Signup
 from app.modules.auth.services.auth_service import AuthService
@@ -60,15 +62,31 @@ class AuthController:
             session,
         )
 
-        # TODO: Send verification email
-        # For now, log the token
-        print(f"\n{'=' * 60}")
-        print(f"EMAIL VERIFICATION for {new_user.email}")
-        print(f"{'=' * 60}")
-        print("Click this link to verify your email:")
-        print(f"  http://localhost:3000/verify-email?token={verification_token}")
-        print(f"  Token expires: {verification_expires}")
-        print(f"{'=' * 60}\n")
+        # Send verification email
+        try:
+            # Read template
+            template_path = Path("app/common/email-templates/verify-email.html")
+            if template_path.exists():
+                template_content = template_path.read_text(encoding="utf-8")
+
+                verification_link: str = (
+                    f"http://localhost:3000/verify-email?token={verification_token}"
+                )
+
+                html_content = template_content.replace(
+                    "{{name}}", f"{new_user.first_name} {new_user.last_name}"
+                )
+                html_content = html_content.replace("{{verify_link}}", verification_link)
+
+                send_mail(
+                    recievers_list=[new_user.email],
+                    subject="Verify your email - Algorithmic Dev",
+                    html=html_content,
+                )
+            else:
+                return ErrorResponse(message="Email template not found", status_code=500)
+        except Exception as e:
+            return ErrorResponse(message=str(e), status_code=500)
 
         return SuccessResponse(
             message="User created successfully. Please verify your email.",
@@ -76,7 +94,7 @@ class AuthController:
                 "user_id": new_user.id,
                 "email": new_user.email,
                 "role": new_user.role,
-                "message": "Verification token has been logged to console (check server logs)",
+                "message": "Verification token has been sent to your email.",
             },
             status_code=201,
         )
@@ -132,7 +150,7 @@ class AuthController:
             samesite="lax",
             domain=settings.DOMAIN,
             path="/",
-            max_age=3600,
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
         )
         response.set_cookie(
             key="refresh_token",
@@ -142,7 +160,7 @@ class AuthController:
             samesite="lax",
             domain=settings.DOMAIN,
             path="/",
-            max_age=604800,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,
         )
 
         return response
@@ -259,7 +277,7 @@ class AuthController:
             httponly=True,
             secure=not settings.DEBUG,
             samesite="lax",
-            max_age=3600,  # 1 hour
+            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,  # 1 hour
         )
         response.set_cookie(
             key="refresh_token",
@@ -267,7 +285,7 @@ class AuthController:
             httponly=True,
             secure=not settings.DEBUG,
             samesite="lax",
-            max_age=604800,  # 7 days
+            max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,  # 7 days
         )
 
         return response

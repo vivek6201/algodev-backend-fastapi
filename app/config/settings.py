@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Algorithmic Dev"
     VERSION: str = "1.0.0"
     DEBUG: bool = False
-    DOMAIN: str = "localhost"
+    DOMAIN: Optional[str] = "localhost"
 
     # Server Settings
     HOST: str = "0.0.0.0"
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
     ALGORITHM: str = "HS256"
 
     # Database
@@ -27,10 +27,7 @@ class Settings(BaseSettings):
     REDIS_URL: Optional[str] = None
 
     # Email (optional)
-    SMTP_HOST: Optional[str] = None
-    SMTP_PORT: Optional[int] = 587
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
+    RESEND_API_KEY: Optional[str] = None
 
     # CORS
     CORS_ORIGINS: list[str] = [
