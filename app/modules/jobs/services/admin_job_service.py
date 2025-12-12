@@ -1,7 +1,8 @@
+from typing import Optional
 from uuid import uuid4
 
 from slugify import slugify
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
 from app.common.lib.formatter import TokenPayload
 from app.modules.jobs.models.jobs import Category, Job, JobStatus
@@ -132,3 +133,20 @@ class AdminJobService(BaseJobService):
         except Exception as e:
             session.rollback()
             raise e
+
+    def get_all_jobs_count(self, session: Session, params: Optional[dict] = None):
+        query = select(func.count()).select_from(Job)
+
+        if not params:
+            return session.exec(query).one()
+
+        if params.get("status"):
+            query = query.where(Job.status == params["status"])
+        if params.get("type"):
+            query = query.where(Job.listing_type == params["type"])
+        if params.get("search"):
+            search = params["search"].strip()
+            query = query.where(Job.title.ilike(f"%{search}%"))
+
+        count = session.exec(query).one()
+        return count

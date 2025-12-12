@@ -1,8 +1,10 @@
-from sqlmodel import Session, create_engine
-from sqlalchemy.orm import sessionmaker
-from typing import Generator
-from app.config.settings import settings
 import logging
+from typing import Generator
+
+from sqlalchemy.orm import sessionmaker
+from sqlmodel import Session, create_engine
+
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +18,15 @@ engine = create_engine(
 )
 
 # Create session factory
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-    class_=Session
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
+
 
 def get_session() -> Generator[Session, None, None]:
     """
     Dependency for getting database session.
     Use with FastAPI Depends for database operations.
     """
-    
+
     session = SessionLocal()
     try:
         yield session

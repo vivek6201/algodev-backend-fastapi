@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlmodel import select
+from sqlmodel import func, select
 from sqlmodel.orm.session import Session
 
 from app.modules.users.models.admin import Admin
@@ -14,13 +14,26 @@ class AdminService:
         admin_id: Optional[int] = None,
         email: Optional[str] = None,
     ):
-        if admin_id:
-            return session.get(Admin, admin_id)
-        if email:
-            statement = select(Admin).where(Admin.email == email)
-            admin = session.exec(statement).first()
+        try:
+            if admin_id:
+                return session.get(Admin, admin_id)
+            if email:
+                statement = select(Admin).where(Admin.email == email)
+                admin = session.exec(statement).first()
             return admin
-        return None
+        except Exception as e:
+            session.rollback()
+            raise e
+
+    def get_admin_count(self, session: Session):
+        """
+        Returns the total count of active admins in the database.
+        """
+        try:
+            return session.exec(select(func.count()).select_from(Admin)).one()
+        except Exception as e:
+            session.rollback()
+            raise e
 
     def create_admin(self, admin_data: AdminCreate, session: Session):
         try:

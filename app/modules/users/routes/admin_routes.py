@@ -16,3 +16,11 @@ async def get_me(
     current_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
 ):
     return admin_controller.get_admin(session=session, admin_id=current_admin.id)
+
+
+@admin_user_router.get("/dashboard")
+async def get_dashboard(
+    session: Session = Depends(get_session),
+    current_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
+):
+    return admin_controller.get_dashboard(session=session, admin_id=current_admin.id)
