@@ -38,7 +38,8 @@ class ApplicationStatus(Enum):
 
 
 class JobCategoryLink(SQLModel, table=True):
-    # Composite Primary Key (Both keys together are unique)
+    """Composite Primary Key (Both keys together are unique)"""
+
     job_id: Optional[int] = Field(default=None, foreign_key="job.id", primary_key=True)
     category_id: Optional[int] = Field(
         default=None,

@@ -12,6 +12,10 @@ from app.common.lib.exception_handlers import (
 )
 from app.config.router import router
 from app.config.settings import settings
+
+# importing models for alembic
+from app.modules.education.blogs.models.blog import *  # noqa: F403
+from app.modules.education.model import *  # noqa: F403
 from app.modules.jobs.models.jobs import *  # noqa: F403
 from app.modules.users.models.admin import *  # noqa: F403
 from app.modules.users.models.user import *  # noqa: F403
