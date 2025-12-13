@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     # Email (optional)
     RESEND_API_KEY: Optional[str] = None
 
+    # AWS
+    AWS_ACCESS_KEY: Optional[str] = None
+    AWS_SECRET_KEY: Optional[str] = None
+    AWS_REGION: Optional[str] = None
+    AWS_S3_BUCKET: Optional[str] = None
+    AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
+    AWS_CLOUDFRONT_KEYPAIR_ID: Optional[str] = None
+    AWS_CLOUDFRONT_PRIVATE_KEY: Optional[str] = None
+
     # CORS
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",

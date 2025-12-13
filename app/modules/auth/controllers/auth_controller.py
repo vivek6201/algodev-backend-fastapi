@@ -5,10 +5,10 @@ from fastapi import Request
 from sqlmodel import Session
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
-from app.config.email import send_mail
 from app.config.settings import settings
 from app.modules.auth.schemas.auth_validations import Login, Signup
 from app.modules.auth.services.auth_service import AuthService
+from app.modules.common.services.email_service import email_service
 from app.modules.users.services.user_service import UserService
 
 
@@ -65,7 +65,7 @@ class AuthController:
         # Send verification email
         try:
             # Read template
-            template_path = Path("app/common/email-templates/verify-email.html")
+            template_path = Path("app/modules/common/email-templates/verify-email.html")
             if template_path.exists():
                 template_content = template_path.read_text(encoding="utf-8")
 
@@ -78,7 +78,7 @@ class AuthController:
                 )
                 html_content = html_content.replace("{{verify_link}}", verification_link)
 
-                send_mail(
+                email_service.send_mail(
                     recievers_list=[new_user.email],
                     subject="Verify your email - Algorithmic Dev",
                     html=html_content,

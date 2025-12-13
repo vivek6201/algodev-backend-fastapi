@@ -18,7 +18,9 @@ dependencies = [
     "bcrypt",
     "python-multipart",
     "python-slugify>=8.0.4",
-    "resend"
+    "resend",
+    "boto3",
+    "cryptography",
 ]
 
 [project.optional-dependencies]
