@@ -14,6 +14,6 @@ def upload_file(file: UploadFile = File(...)):
     )
 
 
-@common_router.get("/get_file")
+@common_router.get("/get_file/{object_name}")
 def get_file(object_name: str):
     return common_controller.get_file(object_name)

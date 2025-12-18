@@ -92,7 +92,9 @@ class BaseBlogService:
 
         total_items = session.exec(select(func.count()).select_from(statement.subquery())).one()
 
-        blogs = session.exec(statement.offset((page - 1) * limit).limit(limit)).all()
+        blogs = session.exec(
+            statement.order_by(Blog.updated_at.desc()).offset((page - 1) * limit).limit(limit)
+        ).all()
 
         blogs_data = []
         for blog in blogs:

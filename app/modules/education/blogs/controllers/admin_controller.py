@@ -1,3 +1,4 @@
+import math
 from typing import Optional
 
 from sqlmodel import Session
@@ -27,10 +28,11 @@ class AdminBlogController:
             blogs, total_items = self.admin_blog_service.get_blogs(session=session, **params)
 
             data = {
-                "blogs": blogs,
+                "data": blogs,
                 "page": params.get("page", 1),
                 "limit": params.get("limit", 10),
                 "total_items": total_items,
+                "total_pages": math.ceil(total_items / params.get("limit", 10)),
             }
 
             return SuccessResponse(message="Blogs fetched successfully", data=data)
