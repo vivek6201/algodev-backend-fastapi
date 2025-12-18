@@ -14,7 +14,7 @@ from app.modules.users.models.user import *
 from app.modules.users.models.admin import *
 from app.modules.jobs.models.jobs import *
 from app.modules.education.blogs.models.blog import *
-from app.modules.education.model import *
+from app.modules.education.shared.model import *
 
 # this is the Alembic Config object
 config = context.config

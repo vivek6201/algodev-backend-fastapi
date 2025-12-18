@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
+from app.common.lib.formatter import FileResponse
 from app.config.settings import settings
 
 
@@ -38,7 +39,7 @@ def _load_cloudfront_private_key_from_file(private_key_path: str):
 
 class S3Service:
     def __init__(self):
-        self.s3_client = boto3.client(
+        self.s3_client: boto3.client = boto3.client(
             "s3",
             aws_access_key_id=settings.AWS_ACCESS_KEY,
             aws_secret_access_key=settings.AWS_SECRET_KEY,
@@ -95,6 +96,31 @@ class S3Service:
             print(f"Error deleting file from S3: {e}")
             return False
         return True
+
+    def get_file(self, object_name: str) -> typing.Optional[dict]:
+        """Get file metadata and signed URL from S3
+
+        :param object_name: S3 object name
+        :return: Dictionary with url, type, extension, size, etc.
+        """
+        try:
+            head_response = self.s3_client.head_object(Bucket=self.bucket_name, Key=object_name)
+
+            url = self.get_signed_url(object_name)
+
+            file_extension = Path(object_name).suffix.lower().lstrip(".")
+
+            return FileResponse(
+                url=url,
+                type=head_response.get("ContentType"),
+                extension=file_extension,
+                size=head_response.get("ContentLength"),
+                last_modified=head_response.get("LastModified"),
+            )
+        except ClientError as e:
+            # If the file doesn't exist or other S3 error
+            print(f"Error getting file info from S3: {e}")
+            return None
 
     def get_signed_url(self, object_name: str, expiration: int = 3600) -> str:
         """Generate a presigned URL to share an S3 object

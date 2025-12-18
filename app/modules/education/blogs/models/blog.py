@@ -1,9 +1,18 @@
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 from sqlmodel import Field, Relationship, SQLModel
 
-from ...model import BlogCategoryLink
+from app.common.db.utils import pg_enum
+from app.modules.education.shared.model import BlogCategoryLink
+
+
+class BlogStatus(Enum):
+    """Enum for blog status"""
+
+    DRAFT = "DRAFT"
+    PUBLISHED = "PUBLISHED"
 
 
 class BlogMetadata(SQLModel, table=True):
@@ -21,6 +30,7 @@ class BlogBase(SQLModel):
     description: str
     content: str
     thumbnail_id: Optional[str] = None
+    status: BlogStatus = pg_enum(BlogStatus, default=BlogStatus.DRAFT, nullable=False)
 
 
 class Blog(BlogBase, table=True):

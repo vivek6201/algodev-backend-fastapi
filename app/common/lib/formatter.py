@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 from fastapi.encoders import jsonable_encoder
@@ -50,3 +51,11 @@ class TokenPayload(BaseModel):
     email: str
     role: str
     exp: Optional[int] = None
+
+
+class FileResponse(BaseModel):
+    url: str
+    type: str
+    extension: str
+    size: int
+    last_modified: datetime

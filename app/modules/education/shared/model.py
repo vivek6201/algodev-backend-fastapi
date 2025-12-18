@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from sqlmodel import Column, Field, ForeignKey, Relationship, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 
 class CategoriesBase(SQLModel):
@@ -14,7 +14,9 @@ class BlogCategoryLink(SQLModel, table=True):
     blog_id: Optional[int] = Field(default=None, foreign_key="blog.id", primary_key=True)
     category_id: Optional[int] = Field(
         default=None,
-        sa_column=Column(ForeignKey("educationcategory.id", ondelete="CASCADE"), primary_key=True),
+        foreign_key="educationcategory.id",
+        primary_key=True,
+        ondelete="CASCADE",
     )
 
 
