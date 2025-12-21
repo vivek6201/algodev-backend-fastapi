@@ -29,7 +29,7 @@ class CommonController:
 
     def get_file(self, object_name: str):
         try:
-            url = self.s3_service.get_signed_url(object_name, expiration=3600)
+            url = self.s3_service.get_url(object_name)
             if not url:
                 raise HTTPException(status_code=500, detail="Failed to generate signed URL")
 

@@ -1,6 +1,9 @@
 from sqlmodel import Session, select
 
-from app.modules.education.shared.model import CategoriesBase, EducationCategory
+from app.modules.education.shared.model import (
+    CategoriesBase,
+    EducationCategory,
+)
 
 
 class EducationService:

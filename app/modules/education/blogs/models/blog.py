@@ -15,15 +15,6 @@ class BlogStatus(Enum):
     PUBLISHED = "PUBLISHED"
 
 
-class BlogMetadata(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True, index=True)
-    blog_id: int = Field(foreign_key="blog.id")
-    blog: Optional["Blog"] = Relationship(back_populates="meta_data")
-
-    likes: int = Field(default=0)
-    dislikes: int = Field(default=0)
-
-
 class BlogBase(SQLModel):
     title: str
     slug: str = Field(index=True, unique=True)
@@ -36,7 +27,6 @@ class BlogBase(SQLModel):
 class Blog(BlogBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
 
-    meta_data: Optional["BlogMetadata"] = Relationship(back_populates="blog")
     categories: List["EducationCategory"] = Relationship(  # noqa: F821
         back_populates="blogs", link_model=BlogCategoryLink
     )

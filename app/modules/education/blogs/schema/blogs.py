@@ -1,8 +1,11 @@
 from datetime import datetime
 from typing import List, Optional
 
+from pydantic import Field
+from pydantic.main import BaseModel
+
 from app.common.lib.formatter import FileResponse
-from app.modules.education.blogs.models.blog import BlogBase, BlogMetadata, BlogStatus
+from app.modules.education.blogs.models.blog import BlogBase, BlogStatus
 from app.modules.education.shared.model import EducationCategory
 
 
@@ -22,9 +25,15 @@ class UpdateBlog(BlogBase):
 
 
 class BlogResponse(BlogBase):
-    meta_data: Optional[BlogMetadata] = None
+    id: int
     categories: Optional[List[EducationCategory]] = None
     thumbnail: Optional[FileResponse] = None
+    thumbnail_id: Optional[str] = Field(default=None, exclude=True)
 
     created_at: datetime
     updated_at: datetime
+
+
+class BlogMetadataResponse(BaseModel):
+    likes: int
+    dislikes: int

@@ -5,7 +5,7 @@ from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
 from app.modules.auth.dependencies import ALL_ADMIN_ROLES, RoleChecker
 from app.modules.education.shared.controllers.base_controller import BaseEducationController
-from app.modules.education.shared.services import EducationService
+from app.modules.education.shared.services.edu_service import EducationService
 from app.modules.users.services.admin_service import AdminService
 
 from ..model import CategoriesBase

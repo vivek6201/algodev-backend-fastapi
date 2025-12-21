@@ -36,6 +36,38 @@ class RoleChecker:
         return auth_service.get_current_user(token)
 
 
+class OptionalRoleChecker:
+    """
+    Optional role checker - returns None if not authenticated or role doesn't match.
+    Used for public endpoints that should work differently for authenticated users.
+    """
+
+    def __init__(self, allowed_roles: list[str], user_type: str = "user"):
+        self.allowed_roles = allowed_roles
+        self.user_type = user_type
+
+    async def __call__(self, request: Request) -> Optional[TokenPayload]:
+        try:
+            if self.user_type == "admin":
+                token = await admin_oauth_scheme(request)
+                auth_service = AdminAuthService()
+            else:
+                token = await optional_oauth_scheme(request)
+                auth_service = AuthService()
+
+            if not token:
+                return None
+
+            if not auth_service.validate_role(token, self.allowed_roles):
+                return None
+
+            if self.user_type == "admin":
+                return auth_service.get_current_admin(token)
+            return auth_service.get_current_user(token)
+        except Exception:
+            return None
+
+
 def get_optional_user(
     token: Optional[str] = Depends(optional_oauth_scheme),
 ) -> Optional[TokenPayload]:

@@ -35,8 +35,6 @@ class Settings(BaseSettings):
     AWS_REGION: Optional[str] = None
     AWS_S3_BUCKET: Optional[str] = None
     AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
-    AWS_CLOUDFRONT_KEYPAIR_ID: Optional[str] = None
-    AWS_CLOUDFRONT_PRIVATE_KEY: Optional[str] = None
 
     # CORS
     CORS_ORIGINS: list[str] = [
