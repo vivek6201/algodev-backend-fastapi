@@ -34,70 +34,76 @@ class AuthController:
                 status_code=400,
             )
 
-        hashed_password = self.auth_service.hash_password(data.password)
-        user_data = {
-            "first_name": data.first_name,
-            "last_name": data.last_name,
-            "email": data.email,
-            "password": hashed_password,
-            "username": data.username,
-        }
-
-        new_user = self.user_service.create_user(user_data, session)
-
-        if new_user.id is None:
-            return ErrorResponse(message="Failed to create user: missing user ID", status_code=400)
-
-        # Generate verification token
-        verification_token = self.auth_service.generate_verification_token()
-        verification_expires = datetime.now() + timedelta(hours=24)
-
-        # Update user with verification token
-        self.user_service.update_user(
-            new_user.id,
-            {
-                "verification_token": verification_token,
-                "verification_token_expires": verification_expires,
-            },
-            session,
-        )
-
-        # Send verification email
         try:
-            # Read template
+            hashed_password = self.auth_service.hash_password(data.password)
+            user_data = {
+                "first_name": data.first_name,
+                "last_name": data.last_name,
+                "email": data.email,
+                "password": hashed_password,
+                "username": data.username,
+            }
+
+            new_user = self.user_service.create_user(user_data, session)
+
+            if new_user.id is None:
+                session.rollback()
+                return ErrorResponse(
+                    message="Failed to create user: missing user ID", status_code=400
+                )
+
+            # Generate verification token
+            verification_token = self.auth_service.generate_verification_token()
+            verification_expires = datetime.now() + timedelta(hours=24)
+
+            # Update user with verification token
+            self.user_service.update_user(
+                new_user.id,
+                {
+                    "verification_token": verification_token,
+                    "verification_token_expires": verification_expires,
+                },
+                session,
+            )
+
+            # Send verification email
             template_path = Path("app/modules/common/email-templates/verify-email.html")
-            if template_path.exists():
-                template_content = template_path.read_text(encoding="utf-8")
-
-                verification_link: str = (
-                    f"http://localhost:3000/verify-email?token={verification_token}"
-                )
-
-                html_content = template_content.replace(
-                    "{{name}}", f"{new_user.first_name} {new_user.last_name}"
-                )
-                html_content = html_content.replace("{{verify_link}}", verification_link)
-
-                email_service.send_mail(
-                    recievers_list=[new_user.email],
-                    subject="Verify your email - Algorithmic Dev",
-                    html=html_content,
-                )
-            else:
+            if not template_path.exists():
+                session.rollback()
                 return ErrorResponse(message="Email template not found", status_code=500)
-        except Exception as e:
-            return ErrorResponse(message=str(e), status_code=500)
 
-        return SuccessResponse(
-            message="User created successfully. Please verify your email.",
-            data={
-                "user_id": new_user.id,
-                "email": new_user.email,
-                "role": new_user.role,
-                "message": "Verification token has been sent to your email.",
-            },
-            status_code=201,
-        )
+            template_content = template_path.read_text(encoding="utf-8")
+
+            verification_link: str = (
+                f"http://localhost:3000/verify-email?token={verification_token}"
+            )
+
+            html_content = template_content.replace(
+                "{{name}}", f"{new_user.first_name} {new_user.last_name}"
+            )
+            html_content = html_content.replace("{{verify_link}}", verification_link)
+            email_service.send_mail(
+                recievers_list=[new_user.email],
+                subject="Verify your email - Algorithmic Dev",
+                html=html_content,
+            )
+
+            # Commit the transaction only after all operations succeed
+            session.commit()
+
+            return SuccessResponse(
+                message="User created successfully. Please verify your email.",
+                data={
+                    "user_id": new_user.id,
+                    "email": new_user.email,
+                    "role": new_user.role,
+                    "message": "Verification token has been sent to your email.",
+                },
+                status_code=201,
+            )
+        except Exception as e:
+            session.rollback()
+            return ErrorResponse(message=str(e), status_code=500)
 
     def login(self, data: Login, session: Session):
         user = None

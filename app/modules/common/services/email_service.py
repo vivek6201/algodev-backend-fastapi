@@ -7,7 +7,7 @@ class EmailService:
     def __init__(self):
         resend.api_key = settings.RESEND_API_KEY
 
-    def send_mail(recievers_list: list[str], subject: str, html: str) -> resend.Email:
+    def send_mail(self, recievers_list: list[str], subject: str, html: str) -> resend.Email:
         params: resend.Emails.SendParams = {
             "from": "info@algorithmicdev.in",
             "to": recievers_list,

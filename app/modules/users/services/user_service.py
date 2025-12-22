@@ -10,7 +10,7 @@ class UserService:
         try:
             user = Users(**user_data)
             session.add(user)
-            session.commit()
+            session.flush()
             session.refresh(user)
             return user
         except Exception as e:
@@ -38,7 +38,7 @@ class UserService:
             for key, value in update_data.items():
                 setattr(user, key, value)
             session.add(user)
-            session.commit()
+            session.flush()
             session.refresh(user)
             return user
         except Exception as e:
