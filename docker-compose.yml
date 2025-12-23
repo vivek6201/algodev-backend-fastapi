@@ -1,29 +1,26 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: algodev_postgres
+  algorithmicdev-backend:
+    image: vivek6201/algorithmicdev_backend:latest
+    container_name: algorithmicdev-backend
     restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
-      POSTGRES_DB: ${POSTGRES_DB:-algorithmicdev}
-      PGDATA: /var/lib/postgresql/data/pgdata
+    user: "1000:1000"
+    command: [ "uv", "run", "start" ]
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - UV_CACHE_DIR=/app/.cache/uv
+      - UV_NO_CACHE=1
     networks:
-      - backend_network
+      - app-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-algorithmicdev}" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_data:
-    driver: local
+      test: [ "CMD", "curl", "-f", "http://localhost:80/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
-  backend_network:
+  app-network:
     driver: bridge

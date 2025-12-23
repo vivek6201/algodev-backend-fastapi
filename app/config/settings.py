@@ -1,5 +1,6 @@
 from typing import Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,14 +37,21 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET: Optional[str] = None
     AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
 
-    # CORS
+    # CORS - parsed from comma-separated string in .env
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://192.168.1.8:3000",
         "http://192.168.1.8:3001",
     ]
-    TRUSTED_HOSTS: list[str] = ["localhost", "127.0.0.1", "::1", "192.168.1.8"]
+    TRUSTED_HOSTS: list[str] = ["localhost", "127.0.0.1", "::1"]
+
+    @field_validator("CORS_ORIGINS", "TRUSTED_HOSTS", mode="before")
+    @classmethod
+    def parse_comma_separated(cls, v):
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", case_sensitive=True, extra="allow"

@@ -44,3 +44,9 @@ if not settings.DEBUG:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.TRUSTED_HOSTS)
 
 app.include_router(router, prefix="/api")
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker and load balancers."""
+    return {"status": "ok"}
