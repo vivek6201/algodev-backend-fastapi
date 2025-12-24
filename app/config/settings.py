@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     ]
     TRUSTED_HOSTS: list[str] = ["localhost", "127.0.0.1", "::1"]
 
+    USER_APP_URL: str = "http://localhost:3000"
+    ADMIN_APP_URL: str = "http://localhost:3001"
+
     @field_validator("CORS_ORIGINS", "TRUSTED_HOSTS", mode="before")
     @classmethod
     def parse_comma_separated(cls, v):

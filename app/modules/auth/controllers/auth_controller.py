@@ -75,7 +75,7 @@ class AuthController:
             template_content = template_path.read_text(encoding="utf-8")
 
             verification_link: str = (
-                f"http://localhost:3000/verify-email?token={verification_token}"
+                f"{settings.USER_APP_URL}/verify-email?token={verification_token}"
             )
 
             html_content = template_content.replace(
@@ -153,7 +153,7 @@ class AuthController:
             value=access_token,
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="lax",
+            samesite="none",
             domain=settings.DOMAIN,
             path="/",
             max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -163,7 +163,7 @@ class AuthController:
             value=refresh_token,
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="lax",
+            samesite="none",
             domain=settings.DOMAIN,
             path="/",
             max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,
@@ -282,7 +282,9 @@ class AuthController:
             value=access_token,
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="lax",
+            samesite="none",
+            domain=settings.DOMAIN,
+            path="/",
             max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,  # 1 hour
         )
         response.set_cookie(
@@ -290,7 +292,9 @@ class AuthController:
             value=refresh_token,
             httponly=True,
             secure=not settings.DEBUG,
-            samesite="lax",
+            domain=settings.DOMAIN,
+            samesite="none",
+            path="/",
             max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,  # 7 days
         )
 

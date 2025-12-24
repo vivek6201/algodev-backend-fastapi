@@ -8,8 +8,8 @@ from app.modules.users.models.user import *  # noqa: F403
 
 
 def create_admin_user():
-    admin_email = "vivekgupta@gmail.com"
-    admin_password = "vivek@123"
+    admin_email = "algorithmicdev9@gmail.com"
+    admin_password = "algodev@9"
     admin_role = AdminRole.SUPER_ADMIN
 
     with Session(engine) as session:

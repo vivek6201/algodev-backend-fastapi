@@ -60,7 +60,8 @@ class AdminAuthController:
             httponly=True,
             max_age=60,
             path="/",
-            samesite="lax",
+            secure=not settings.DEBUG,
+            samesite="none",
             domain=settings.DOMAIN,
         )
         response.set_cookie(
@@ -69,7 +70,8 @@ class AdminAuthController:
             httponly=True,
             max_age=3600,
             path="/",
-            samesite="lax",
+            secure=not settings.DEBUG,
+            samesite="none",
             domain=settings.DOMAIN,
         )
 
@@ -145,7 +147,8 @@ class AdminAuthController:
             httponly=True,
             max_age=60,
             path="/",
-            samesite="lax",
+            secure=not settings.DEBUG,
+            samesite="none",
             domain=settings.DOMAIN,
         )
 
@@ -155,7 +158,8 @@ class AdminAuthController:
             httponly=True,
             max_age=3600,
             path="/",
-            samesite="lax",
+            secure=not settings.DEBUG,
+            samesite="none",
             domain=settings.DOMAIN,
         )
 
