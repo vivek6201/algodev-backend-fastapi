@@ -88,7 +88,7 @@ class AdminJobService(BaseJobService):
             return None
 
         try:
-            job_dict = job_data.model_dump(exclude={"category_id", "slug"})
+            job_dict = job_data.model_dump(exclude={"category_id", "slug", "status"})
 
             for key, value in job_dict.items():
                 setattr(job, key, value)

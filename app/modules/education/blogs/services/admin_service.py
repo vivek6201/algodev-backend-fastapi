@@ -43,7 +43,9 @@ class AdminBlogService(BaseBlogService):
             raise e
 
     async def update_blog(self, session: AsyncSession, blog_slug: str, blog_data: UpdateBlog):
-        blog = await self.get_blog_instance(session=session, blog_slug=blog_slug)
+        blog = await self.get_blog_instance(
+            session=session, blog_slug=blog_slug, load_categories=True
+        )
 
         if not blog:
             return None

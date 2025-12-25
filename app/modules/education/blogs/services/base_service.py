@@ -111,14 +111,8 @@ class BaseBlogService:
 
         return blogs_data, total_items
 
-    async def get_blog_metadata(
-        self, session: AsyncSession, blog_slug: str, user_id: int = None
-    ) -> Optional[BlogResponse]:
+    async def get_blog_metadata(self, session: AsyncSession, blog_slug: str, user_id: int = None):
         try:
-            blog = await self.get_blog_instance(session=session, blog_slug=blog_slug)
-            if not blog:
-                return None
-
             user_reaction = None
             if user_id:
                 user_reaction = await self.reaction_service.get_user_reaction(
@@ -129,14 +123,11 @@ class BaseBlogService:
                 session=session, content_slug=blog_slug
             )
 
-            file_details = await self.s3_service.get_file(object_name=blog.image_url)
-
-            return BlogResponse(
-                **blog.dict(),
-                reaction_counts=reaction_counts,
-                user_reaction=user_reaction,
-                file_details=file_details,
-            )
+            return {
+                "current_reaction": user_reaction.reaction,
+                "likes": reaction_counts["likes"],
+                "dislikes": reaction_counts["dislikes"],
+            }
         except Exception as e:
             raise e
 

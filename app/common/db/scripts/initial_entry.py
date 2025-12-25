@@ -1,5 +1,8 @@
+import asyncio
+
 from bcrypt import gensalt, hashpw
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.db.config import engine
 from app.modules.jobs.models.jobs import *  # noqa: F403
@@ -7,15 +10,16 @@ from app.modules.users.models.admin import Admin, AdminRole
 from app.modules.users.models.user import *  # noqa: F403
 
 
-def create_admin_user():
+async def create_admin_user():
     admin_email = "algorithmicdev9@gmail.com"
     admin_password = "algodev@9"
     admin_role = AdminRole.SUPER_ADMIN
 
-    with Session(engine) as session:
+    async with AsyncSession(engine) as session:
         try:
             # Check if admin already exists
-            existing = session.exec(select(Admin).where(Admin.email == admin_email)).first()
+            result = await session.exec(select(Admin).where(Admin.email == admin_email))
+            existing = result.first()
 
             if existing:
                 print("Admin user already exists.")
@@ -31,15 +35,15 @@ def create_admin_user():
                 refresh_token=None,
             )
             session.add(admin_user)
-            session.commit()
+            await session.commit()
             print("Admin user created successfully.")
         except Exception as e:
             print(f"Error creating admin user: {e}")
 
 
-def main():
-    create_admin_user()
+async def main():
+    await create_admin_user()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

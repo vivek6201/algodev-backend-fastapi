@@ -73,7 +73,7 @@ class ReactionService:
         self,
         session: AsyncSession,
         content_slug: str,
-    ) -> dict:
+    ):
         """Get like/dislike counts for specific content"""
         statement = (
             select(UserReaction.reaction, func.count(UserReaction.id))
