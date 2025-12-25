@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_404_NOT_FOUND
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse
@@ -13,9 +13,9 @@ class BaseBlogController:
     def __init__(self):
         self.base_service = BaseBlogService()
 
-    def get_blogs(self, session: Session, params: Optional[dict] = None):
+    async def get_blogs(self, session: AsyncSession, params: Optional[dict] = None):
         try:
-            blogs, total_items = self.base_service.get_blogs(session=session, **params)
+            blogs, total_items = await self.base_service.get_blogs(session=session, **params)
 
             data = {
                 "data": blogs,
@@ -30,9 +30,9 @@ class BaseBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def get_blog(self, session: Session, blog_slug: str):
+    async def get_blog(self, session: AsyncSession, blog_slug: str):
         try:
-            blog = self.base_service.get_blog_with_details(
+            blog = await self.base_service.get_blog_with_details(
                 session=session, blog_slug=blog_slug, status=BlogStatus.PUBLISHED
             )
 
@@ -44,9 +44,11 @@ class BaseBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def get_blog_metadata(self, session: Session, blog_slug: str, user_id: Optional[int] = None):
+    async def get_blog_metadata(
+        self, session: AsyncSession, blog_slug: str, user_id: Optional[int] = None
+    ):
         try:
-            blog = self.base_service.get_blog_metadata(
+            blog = await self.base_service.get_blog_metadata(
                 session=session, blog_slug=blog_slug, user_id=user_id
             )
 
@@ -58,9 +60,11 @@ class BaseBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def update_blog_reaction(self, session: Session, blog_slug: str, user_id: int, action: str):
+    async def update_blog_reaction(
+        self, session: AsyncSession, blog_slug: str, user_id: int, action: str
+    ):
         try:
-            result = self.base_service.toggle_blog_reaction(
+            result = await self.base_service.toggle_blog_reaction(
                 session=session, blog_slug=blog_slug, user_id=user_id, action=action
             )
 

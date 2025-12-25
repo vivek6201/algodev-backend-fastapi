@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import HTTPException
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.lib.formatter import SuccessResponse
 from app.modules.jobs.models.jobs import JobStatus, ListingType
@@ -12,9 +12,9 @@ class JobController:
     def __init__(self):
         self.job_service = BaseJobService()
 
-    def list_jobs(
+    async def list_jobs(
         self,
-        session: Session,
+        session: AsyncSession,
         page: int,
         limit: int,
         search: Optional[str] = None,
@@ -31,7 +31,7 @@ class JobController:
                 "search": search,
             }
 
-            result = self.job_service.list_jobs(**params)
+            result = await self.job_service.list_jobs(**params)
 
             return SuccessResponse(
                 message="Jobs fetched successfully",
@@ -46,16 +46,18 @@ class JobController:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def get_job(self, session: Session, job_slug: str, status: Optional[JobStatus] = None):
+    async def get_job(
+        self, session: AsyncSession, job_slug: str, status: Optional[JobStatus] = None
+    ):
         try:
-            job = self.job_service.get_job(session, job_slug, status)
+            job = await self.job_service.get_job(session, job_slug, status)
             return SuccessResponse(message="Job fetched successfully", data=job)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def get_categories(self, session: Session, query: str | None = None):
+    async def get_categories(self, session: AsyncSession, query: str | None = None):
         try:
-            categories = self.job_service.get_all_categories(session, query)
+            categories = await self.job_service.get_all_categories(session, query)
             return SuccessResponse(message="Categories fetched successfully", data=categories)
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))

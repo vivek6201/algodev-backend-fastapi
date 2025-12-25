@@ -1,7 +1,8 @@
 from typing import Optional
 
 from sqlalchemy.orm.strategy_options import selectinload
-from sqlmodel import Session, func, select
+from sqlmodel import func, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.modules.common.services.s3_service import S3Service
 from app.modules.education.blogs.schema.blogs import BlogResponse
@@ -16,9 +17,9 @@ class BaseBlogService:
         self.s3_service = S3Service()
         self.reaction_service = ReactionService()
 
-    def get_blog_instance(
+    async def get_blog_instance(
         self,
-        session: Session,
+        session: AsyncSession,
         blog_id: Optional[int] = None,
         blog_slug: Optional[str] = None,
         status: Optional[BlogStatus] = None,
@@ -41,18 +42,19 @@ class BaseBlogService:
         if load_categories:
             statement = statement.options(selectinload(Blog.categories))
 
-        blog = session.exec(statement).one_or_none()
+        result = await session.exec(statement)
+        blog = result.one_or_none()
 
         return blog
 
-    def get_blog_with_details(
+    async def get_blog_with_details(
         self,
-        session: Session,
+        session: AsyncSession,
         blog_slug: Optional[str] = None,
         blog_id: Optional[int] = None,
         status: Optional[BlogStatus] = None,
     ):
-        blog = self.get_blog_instance(
+        blog = await self.get_blog_instance(
             session=session,
             blog_slug=blog_slug,
             blog_id=blog_id,
@@ -72,9 +74,9 @@ class BaseBlogService:
                 blog_dict["thumbnail"] = thumbnail
         return BlogResponse(**blog_dict)
 
-    def get_blogs(
+    async def get_blogs(
         self,
-        session: Session,
+        session: AsyncSession,
         page: int,
         limit: int,
         status: Optional[BlogStatus] = None,
@@ -88,11 +90,13 @@ class BaseBlogService:
         if search:
             statement = statement.where(Blog.title.contains(f"%{search}%"))
 
-        total_items = session.exec(select(func.count()).select_from(statement.subquery())).one()
+        count_result = await session.exec(select(func.count()).select_from(statement.subquery()))
+        total_items = count_result.one()
 
-        blogs = session.exec(
+        result = await session.exec(
             statement.order_by(Blog.updated_at.desc()).offset((page - 1) * limit).limit(limit)
-        ).all()
+        )
+        blogs = result.all()
 
         blogs_data = []
         for blog in blogs:
@@ -107,46 +111,44 @@ class BaseBlogService:
 
         return blogs_data, total_items
 
-    def get_blog_metadata(
-        self, session: Session, blog_slug: str, user_id: Optional[int] = None
-    ) -> Optional[dict]:
-        """Get blog reaction counts"""
-        blog = self.get_blog_instance(session=session, blog_slug=blog_slug)
+    async def get_blog_metadata(
+        self, session: AsyncSession, blog_slug: str, user_id: int = None
+    ) -> Optional[BlogResponse]:
+        try:
+            blog = await self.get_blog_instance(session=session, blog_slug=blog_slug)
+            if not blog:
+                return None
 
-        if not blog:
-            return None
+            user_reaction = None
+            if user_id:
+                user_reaction = await self.reaction_service.get_user_reaction(
+                    session=session, content_slug=blog_slug, user_id=user_id
+                )
 
-        counts = self.reaction_service.get_reaction_counts(
-            session=session,
-            content_slug=blog.slug,
-        )
-
-        res = {
-            "likes": counts["likes"],
-            "dislikes": counts["dislikes"],
-        }
-
-        if user_id:
-            user_reaction = self.reaction_service.get_user_reaction(
-                session=session,
-                content_slug=blog.slug,
-                user_id=user_id,
+            reaction_counts = await self.reaction_service.get_reaction_counts(
+                session=session, content_slug=blog_slug
             )
 
-            if user_reaction:
-                res["current_reaction"] = user_reaction.reaction
+            file_detaisl = await self.s3_service.get_file(object_name=blog.image_url)
 
-        return res
+            return BlogResponse(
+                **blog.dict(),
+                reaction_counts=reaction_counts,
+                user_reaction=user_reaction,
+                file_details=file_detaisl,
+            )
+        except Exception as e:
+            raise e
 
-    def toggle_blog_reaction(
+    async def toggle_blog_reaction(
         self,
-        session: Session,
+        session: AsyncSession,
         blog_slug: str,
         user_id: int,
         action: str,
     ) -> Optional[dict]:
         """Toggle a reaction on a blog"""
-        blog = self.get_blog_instance(session=session, blog_slug=blog_slug)
+        blog = await self.get_blog_instance(session=session, blog_slug=blog_slug)
 
         if not blog:
             return None
@@ -155,7 +157,7 @@ class BaseBlogService:
         reaction_type = ReactionType.LIKE if action == "like" else ReactionType.DISLIKE
 
         # Toggle reaction using content_slug
-        result = self.reaction_service.toggle_reaction(
+        result = await self.reaction_service.toggle_reaction(
             session=session,
             user_id=user_id,
             content_slug=blog.slug,
@@ -163,7 +165,7 @@ class BaseBlogService:
         )
 
         # Get fresh counts from UserReaction table
-        counts = self.reaction_service.get_reaction_counts(
+        counts = await self.reaction_service.get_reaction_counts(
             session=session,
             content_slug=blog.slug,
         )

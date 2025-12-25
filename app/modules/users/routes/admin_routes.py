@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlmodel.orm.session import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.db.config import get_session
 from app.common.lib.formatter import TokenPayload
@@ -12,15 +12,15 @@ admin_controller = AdminController()
 
 @admin_user_router.get("/me")
 async def get_me(
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     current_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
 ):
-    return admin_controller.get_admin(session=session, admin_id=current_admin.id)
+    return await admin_controller.get_admin(session=session, admin_id=current_admin.id)
 
 
 @admin_user_router.get("/dashboard")
 async def get_dashboard(
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     current_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
 ):
-    return admin_controller.get_dashboard(session=session, admin_id=current_admin.id)
+    return await admin_controller.get_dashboard(session=session, admin_id=current_admin.id)

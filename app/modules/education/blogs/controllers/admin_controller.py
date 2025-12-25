@@ -1,7 +1,7 @@
 import math
 from typing import Optional
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_404_NOT_FOUND
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
@@ -18,14 +18,16 @@ class AdminBlogController:
         self.admin_blog_service = AdminBlogService()
         self.admin_service = AdminService()
 
-    def get_blogs(self, session: Session, curr_admin: TokenPayload, params: Optional[dict] = None):
+    async def get_blogs(
+        self, session: AsyncSession, curr_admin: TokenPayload, params: Optional[dict] = None
+    ):
         try:
-            admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+            admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-            blogs, total_items = self.admin_blog_service.get_blogs(session=session, **params)
+            blogs, total_items = await self.admin_blog_service.get_blogs(session=session, **params)
 
             data = {
                 "data": blogs,
@@ -40,14 +42,14 @@ class AdminBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def get_blog(self, session: Session, curr_admin: TokenPayload, blog_slug: str):
+    async def get_blog(self, session: AsyncSession, curr_admin: TokenPayload, blog_slug: str):
         try:
-            admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+            admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-            blog = self.admin_blog_service.get_blog_with_details(
+            blog = await self.admin_blog_service.get_blog_with_details(
                 session=session, blog_slug=blog_slug
             )
 
@@ -59,28 +61,30 @@ class AdminBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def create_blog(self, session: Session, blog_data: CreateBlog, curr_admin: TokenPayload):
+    async def create_blog(
+        self, session: AsyncSession, blog_data: CreateBlog, curr_admin: TokenPayload
+    ):
         try:
-            admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+            admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-            return self.admin_blog_service.create_blog(session=session, blog_data=blog_data)
+            return await self.admin_blog_service.create_blog(session=session, blog_data=blog_data)
         except Exception as e:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def update_blog(
-        self, session: Session, blog_slug: str, blog_data: UpdateBlog, curr_admin: TokenPayload
+    async def update_blog(
+        self, session: AsyncSession, blog_slug: str, blog_data: UpdateBlog, curr_admin: TokenPayload
     ):
         try:
-            admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+            admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-            blog = self.admin_blog_service.update_blog(
+            blog = await self.admin_blog_service.update_blog(
                 session=session, blog_slug=blog_slug, blog_data=blog_data
             )
 
@@ -92,16 +96,16 @@ class AdminBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def update_blog_status(
-        self, session: Session, blog_slug: str, status: BlogStatus, curr_admin: TokenPayload
+    async def update_blog_status(
+        self, session: AsyncSession, blog_slug: str, status: BlogStatus, curr_admin: TokenPayload
     ):
         try:
-            admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+            admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-            blog = self.admin_blog_service.update_blog(
+            blog = await self.admin_blog_service.update_blog(
                 session=session, blog_slug=blog_slug, blog_data=UpdateBlog(status=status)
             )
 

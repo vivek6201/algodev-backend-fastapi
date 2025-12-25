@@ -1,62 +1,64 @@
 from typing import Optional
 
 from sqlmodel import func, select
-from sqlmodel.orm.session import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.modules.users.models.admin import Admin
 from app.modules.users.schemas.admin_validations import AdminCreate
 
 
 class AdminService:
-    def get_admin(
+    async def get_admin(
         self,
-        session: Session,
+        session: AsyncSession,
         admin_id: Optional[int] = None,
         email: Optional[str] = None,
     ):
         try:
             if admin_id:
-                return session.get(Admin, admin_id)
+                return await session.get(Admin, admin_id)
             if email:
                 statement = select(Admin).where(Admin.email == email)
-                admin = session.exec(statement).first()
+                result = await session.exec(statement)
+                admin = result.first()
             return admin
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
 
-    def get_admin_count(self, session: Session):
+    async def get_admin_count(self, session: AsyncSession):
         """
         Returns the total count of active admins in the database.
         """
         try:
-            return session.exec(select(func.count()).select_from(Admin)).one()
+            result = await session.exec(select(func.count()).select_from(Admin))
+            return result.one()
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
 
-    def create_admin(self, admin_data: AdminCreate, session: Session):
+    async def create_admin(self, admin_data: AdminCreate, session: AsyncSession):
         try:
             admin = Admin(**admin_data.model_dump())
             session.add(admin)
-            session.commit()
-            session.refresh(admin)
+            await session.commit()
+            await session.refresh(admin)
             return admin
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
 
-    def update_admin(self, admin_id: int, update_data: dict, session: Session):
+    async def update_admin(self, admin_id: int, update_data: dict, session: AsyncSession):
         try:
-            admin = session.get(Admin, admin_id)
+            admin = await session.get(Admin, admin_id)
             if not admin:
                 return None
             for key, value in update_data.items():
                 setattr(admin, key, value)
             session.add(admin)
-            session.commit()
-            session.refresh(admin)
+            await session.commit()
+            await session.refresh(admin)
             return admin
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e

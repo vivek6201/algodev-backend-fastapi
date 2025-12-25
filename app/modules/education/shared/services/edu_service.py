@@ -1,4 +1,5 @@
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.modules.education.shared.model import (
     CategoriesBase,
@@ -7,42 +8,45 @@ from app.modules.education.shared.model import (
 
 
 class EducationService:
-    def get_category(self, session: Session, category_id: int):
+    async def get_category(self, session: AsyncSession, category_id: int):
         try:
-            return session.get(EducationCategory, category_id)
+            return await session.get(EducationCategory, category_id)
         except Exception as e:
             raise e
 
-    def get_categories(self, session: Session):
+    async def get_categories(self, session: AsyncSession):
         try:
-            return session.exec(select(EducationCategory)).all()
+            result = await session.exec(select(EducationCategory))
+            return result.all()
         except Exception as e:
             raise e
 
-    def create_category(self, session: Session, category_data: CategoriesBase):
+    async def create_category(self, session: AsyncSession, category_data: CategoriesBase):
         try:
             category = EducationCategory(**category_data.dict())
             session.add(category)
-            session.commit()
-            session.refresh(category)
+            await session.commit()
+            await session.refresh(category)
             return category
         except Exception as e:
             raise e
 
-    def update_category(self, session: Session, category_id: int, category_data: CategoriesBase):
+    async def update_category(
+        self, session: AsyncSession, category_id: int, category_data: CategoriesBase
+    ):
         try:
-            category = self.get_category(session=session, category_id=category_id)
+            category = await self.get_category(session=session, category_id=category_id)
 
             if not category:
                 return None
 
             category.name = category_data.name
             session.add(category)
-            session.commit()
-            session.refresh(category)
+            await session.commit()
+            await session.refresh(category)
             return category
         except Exception as e:
             raise e
 
-    def delete_category(self, session: Session, category_id: int):
+    async def delete_category(self, session: AsyncSession, category_id: int):
         pass

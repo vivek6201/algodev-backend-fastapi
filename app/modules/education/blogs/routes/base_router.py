@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.db.config import get_session
 from app.common.lib.formatter import TokenPayload
@@ -15,7 +15,7 @@ base_controller = BaseBlogController()
 
 
 @base_router.get("/", tags=["Blogs"])
-def get_blogs(request: Request, session: Session = Depends(get_session)):
+async def get_blogs(request: Request, session: AsyncSession = Depends(get_session)):
     query_params = request.query_params
 
     page_param = query_params.get("page", 1)
@@ -28,31 +28,31 @@ def get_blogs(request: Request, session: Session = Depends(get_session)):
         "status": BlogStatus.PUBLISHED,
     }
 
-    return base_controller.get_blogs(session, params=params)
+    return await base_controller.get_blogs(session, params=params)
 
 
 @base_router.get("/one/{blog_slug}", tags=["Blogs"])
-def get_blog(blog_slug: str, session: Session = Depends(get_session)):
-    return base_controller.get_blog(session, blog_slug=blog_slug)
+async def get_blog(blog_slug: str, session: AsyncSession = Depends(get_session)):
+    return await base_controller.get_blog(session, blog_slug=blog_slug)
 
 
 @base_router.get("/{blog_slug}/metadata", tags=["Blogs"])
-def get_blog_metadata(
+async def get_blog_metadata(
     blog_slug: str,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     curr_user: Optional[TokenPayload] = Depends(OptionalRoleChecker(allowed_roles=ALL_USER_ROLES)),
 ):
     user_id = curr_user.id if curr_user else None
-    return base_controller.get_blog_metadata(session, blog_slug=blog_slug, user_id=user_id)
+    return await base_controller.get_blog_metadata(session, blog_slug=blog_slug, user_id=user_id)
 
 
 @base_router.patch("/{blog_slug}/react", tags=["Blogs"])
-def update_blog_reaction(
+async def update_blog_reaction(
     blog_slug: str,
     action: str,
-    session: Session = Depends(get_session),
+    session: AsyncSession = Depends(get_session),
     curr_user: TokenPayload = Depends(RoleChecker(allowed_roles=ALL_USER_ROLES)),
 ):
-    return base_controller.update_blog_reaction(
+    return await base_controller.update_blog_reaction(
         session, blog_slug=blog_slug, user_id=curr_user.id, action=action
     )

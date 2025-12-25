@@ -3,6 +3,7 @@ from pathlib import Path
 
 import boto3
 from botocore.exceptions import ClientError
+from starlette.concurrency import run_in_threadpool
 
 from app.common.lib.formatter import FileResponse
 from app.config.settings import settings
@@ -19,7 +20,7 @@ class S3Service:
         self.bucket_name = settings.AWS_S3_BUCKET
         self.cloudfront_domain = settings.AWS_CLOUDFRONT_DOMAIN
 
-    def upload_file(
+    async def upload_file(
         self, file_obj: typing.IO, object_name: str, content_type: str = None
     ) -> typing.Optional[str]:
         """Upload a file to an S3 bucket
@@ -34,35 +35,47 @@ class S3Service:
             extra_args["ContentType"] = content_type
 
         try:
-            self.s3_client.upload_fileobj(
-                file_obj, self.bucket_name, object_name, ExtraArgs=extra_args
-            )
+
+            def _upload():
+                self.s3_client.upload_fileobj(
+                    file_obj, self.bucket_name, object_name, ExtraArgs=extra_args
+                )
+
+            await run_in_threadpool(_upload)
         except ClientError as e:
             print(f"Error uploading file to S3: {e}")
             return None
         return object_name
 
-    def delete_file(self, object_name: str) -> bool:
+    async def delete_file(self, object_name: str) -> bool:
         """Delete a file from an S3 bucket
 
         :param object_name: S3 object name to delete
         :return: True if file was deleted, else False
         """
         try:
-            self.s3_client.delete_object(Bucket=self.bucket_name, Key=object_name)
+
+            def _delete():
+                self.s3_client.delete_object(Bucket=self.bucket_name, Key=object_name)
+
+            await run_in_threadpool(_delete)
         except ClientError as e:
             print(f"Error deleting file from S3: {e}")
             return False
         return True
 
-    def get_file(self, object_name: str) -> typing.Optional[dict]:
+    async def get_file(self, object_name: str) -> typing.Optional[dict]:
         """Get file metadata and URL from S3
 
         :param object_name: S3 object name
         :return: Dictionary with url, type, extension, size, etc.
         """
         try:
-            head_response = self.s3_client.head_object(Bucket=self.bucket_name, Key=object_name)
+
+            def _head():
+                return self.s3_client.head_object(Bucket=self.bucket_name, Key=object_name)
+
+            head_response = await run_in_threadpool(_head)
 
             url = self.get_url(object_name)
 

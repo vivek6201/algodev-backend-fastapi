@@ -1,4 +1,3 @@
-import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -106,7 +105,3 @@ class AuthService:
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-    def generate_verification_token(self) -> str:
-        """Generate a secure random verification token"""
-        return secrets.token_urlsafe(32)

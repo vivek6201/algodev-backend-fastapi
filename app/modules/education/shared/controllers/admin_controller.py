@@ -1,5 +1,5 @@
 from fastapi.param_functions import Depends
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
@@ -16,15 +16,15 @@ class AdminEducationController(BaseEducationController):
         self.service = EducationService()
         self.admin_service = AdminService()
 
-    def create_category(
-        self, session: Session, category_data: CategoriesBase, curr_admin: TokenPayload
+    async def create_category(
+        self, session: AsyncSession, category_data: CategoriesBase, curr_admin: TokenPayload
     ):
-        admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+        admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
         if not admin:
             return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-        category = self.service.create_category(session=session, category_data=category_data)
+        category = await self.service.create_category(session=session, category_data=category_data)
 
         if not category:
             return ErrorResponse(
@@ -33,19 +33,19 @@ class AdminEducationController(BaseEducationController):
 
         return SuccessResponse(message="Category created successfully", data=category)
 
-    def update_category(
+    async def update_category(
         self,
-        session: Session,
+        session: AsyncSession,
         category_id: int,
         category_data: CategoriesBase,
         curr_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
     ):
-        admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+        admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
         if not admin:
             return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-        category = self.service.update_category(
+        category = await self.service.update_category(
             session=session, category_id=category_id, category_data=category_data
         )
 

@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = ""
 
+    @property
+    def ASYNC_DATABASE_URL(self) -> str:
+        return self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+
     # Redis (optional)
     REDIS_URL: Optional[str] = None
 
@@ -36,6 +40,10 @@ class Settings(BaseSettings):
     AWS_REGION: Optional[str] = None
     AWS_S3_BUCKET: Optional[str] = None
     AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
+
+    # Redis
+    REDIS_HOST: Optional[str] = None
+    REDIS_PORT: Optional[int] = None
 
     # CORS - parsed from comma-separated string in .env
     CORS_ORIGINS: list[str] = [
