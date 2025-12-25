@@ -69,7 +69,7 @@ class BaseBlogService:
         blog_dict["categories"] = blog.categories
 
         if blog.thumbnail_id:
-            thumbnail = self.s3_service.get_file(object_name=blog.thumbnail_id)
+            thumbnail = await self.s3_service.get_file(object_name=blog.thumbnail_id)
             if thumbnail:
                 blog_dict["thumbnail"] = thumbnail
         return BlogResponse(**blog_dict)
@@ -102,7 +102,7 @@ class BaseBlogService:
         for blog in blogs:
             blog_dict = blog.model_dump()
             if blog.thumbnail_id:
-                thumbnail = self.s3_service.get_file(object_name=blog.thumbnail_id)
+                thumbnail = await self.s3_service.get_file(object_name=blog.thumbnail_id)
                 if thumbnail:
                     blog_dict["thumbnail"] = thumbnail
 
@@ -129,13 +129,13 @@ class BaseBlogService:
                 session=session, content_slug=blog_slug
             )
 
-            file_detaisl = await self.s3_service.get_file(object_name=blog.image_url)
+            file_details = await self.s3_service.get_file(object_name=blog.image_url)
 
             return BlogResponse(
                 **blog.dict(),
                 reaction_counts=reaction_counts,
                 user_reaction=user_reaction,
-                file_details=file_detaisl,
+                file_details=file_details,
             )
         except Exception as e:
             raise e
