@@ -1,5 +1,4 @@
-from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
@@ -58,4 +57,13 @@ class FileResponse(BaseModel):
     type: str
     extension: str
     size: int
-    last_modified: datetime
+    id: str
+
+
+T = TypeVar("T")
+
+
+class ListResponse(BaseModel, Generic[T]):
+    data: List[T]
+    total_items: int
+    total_pages: int

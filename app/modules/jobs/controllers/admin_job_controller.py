@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
 from app.modules.jobs.controllers.job_controller import JobController
@@ -18,18 +18,18 @@ class AdminJobController(JobController):
     def __init__(self):
         self.job_service = AdminJobService()
 
-    def create_category(
+    async def create_category(
         self,
-        session: Session,
+        session: AsyncSession,
         category_data: CategoryCreate,
         current_admin: TokenPayload,
     ):
         try:
-            admin = session.get(Admin, current_admin.id)
+            admin = await session.get(Admin, current_admin.id)
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=404)
 
-            new_category = self.job_service.create_category(session, category_data)
+            new_category = await self.job_service.create_category(session, category_data)
 
             if not new_category:
                 return ErrorResponse(
@@ -42,20 +42,20 @@ class AdminJobController(JobController):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def update_category(
+    async def update_category(
         self,
-        session: Session,
+        session: AsyncSession,
         category_id: int,
         category_data: CategoryUpdate,
         current_admin: TokenPayload,
     ):
         try:
-            admin = session.get(Admin, current_admin.id)
+            admin = await session.get(Admin, current_admin.id)
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=404)
 
-            updated_category = self.job_service.update_category(
-                session, category_id, category_data, admin
+            updated_category = await self.job_service.update_category(
+                session, category_id, category_data
             )
 
             if not updated_category:
@@ -67,18 +67,18 @@ class AdminJobController(JobController):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def create_job(
+    async def create_job(
         self,
-        session: Session,
+        session: AsyncSession,
         job_data: ThirdPartyJobCreate,
         current_admin: TokenPayload,
     ):
         try:
-            admin = session.get(Admin, current_admin.id)
+            admin = await session.get(Admin, current_admin.id)
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=404)
 
-            new_job = self.job_service.create_job(session, job_data, admin)
+            new_job = await self.job_service.create_job(session, job_data, admin)
 
             if not new_job:
                 return ErrorResponse(message="Job with this title already exists", status_code=400)
@@ -89,19 +89,19 @@ class AdminJobController(JobController):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def update_job(
+    async def update_job(
         self,
-        session: Session,
+        session: AsyncSession,
         job_slug: str,
         job_data: ThirdPartyJobUpdate,
         current_admin: TokenPayload,
     ):
         try:
-            admin = session.get(Admin, current_admin.id)
+            admin = await session.get(Admin, current_admin.id)
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=404)
 
-            updated_job = self.job_service.update_job(session, job_slug, job_data)
+            updated_job = await self.job_service.update_job(session, job_slug, job_data)
 
             if not updated_job:
                 return ErrorResponse(message="Job not found", status_code=404)
@@ -114,19 +114,19 @@ class AdminJobController(JobController):
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-    def update_job_status(
+    async def update_job_status(
         self,
-        session: Session,
+        session: AsyncSession,
         job_slug: str,
         status: JobStatus,
         current_admin: TokenPayload,
     ):
         try:
-            admin = session.get(Admin, current_admin.id)
+            admin = await session.get(Admin, current_admin.id)
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=404)
 
-            result = self.job_service.update_job_status(session, job_slug, status)
+            result = await self.job_service.update_job_status(session, job_slug, status)
 
             if not result["status"]:
                 return ErrorResponse(message=result["message"], status_code=400)

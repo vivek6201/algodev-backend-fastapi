@@ -1,5 +1,6 @@
 from fastapi import Request
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
 from app.config.settings import settings
@@ -14,13 +15,14 @@ class AdminAuthController:
         self.admin_auth_service = AdminAuthService()
         self.admin_service = AdminService()
 
-    def admin_login(
+    async def admin_login(
         self,
         body: AdminLogin,
-        session: Session,
+        session: AsyncSession,
     ):
         try:
-            admin = session.exec(select(Admin).where(Admin.email == body.email)).one_or_none()
+            result = await session.exec(select(Admin).where(Admin.email == body.email))
+            admin = result.one_or_none()
         except Exception as e:
             return ErrorResponse(message=str(e), status_code=500)
 
@@ -40,7 +42,9 @@ class AdminAuthController:
         refresh_token = self.admin_auth_service.create_refresh_token(payload)
 
         if admin.id is not None:
-            self.admin_service.update_admin(admin.id, {"refresh_token": refresh_token}, session)
+            await self.admin_service.update_admin(
+                admin.id, {"refresh_token": refresh_token}, session
+            )
 
         # Create response object
         response = SuccessResponse(
@@ -77,14 +81,14 @@ class AdminAuthController:
 
         return response
 
-    def admin_logout(self, session: Session, current_admin: TokenPayload):
-        admin = self.admin_service.get_admin(admin_id=current_admin.id, session=session)
+    async def admin_logout(self, session: AsyncSession, current_admin: TokenPayload):
+        admin = await self.admin_service.get_admin(admin_id=current_admin.id, session=session)
 
         if not admin:
             return ErrorResponse(message="Admin not found", status_code=404)
 
         if admin.id is not None:
-            self.admin_service.update_admin(admin.id, {"refresh_token": None}, session)
+            await self.admin_service.update_admin(admin.id, {"refresh_token": None}, session)
 
         # Create response object
         response = SuccessResponse(
@@ -97,7 +101,7 @@ class AdminAuthController:
 
         return response
 
-    def refresh_admin_token(self, session: Session, request: Request):
+    async def refresh_admin_token(self, session: AsyncSession, request: Request):
         refresh_token = request.cookies.get("refresh_token")
 
         if not refresh_token:
@@ -108,12 +112,12 @@ class AdminAuthController:
 
         curr_admin = self.admin_auth_service.get_current_admin(refresh_token)
 
-        admin = self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
+        admin = await self.admin_service.get_admin(session=session, admin_id=curr_admin.id)
 
         if not admin or admin.refresh_token != refresh_token:
             return ErrorResponse(message="Invalid refresh token", status_code=401)
 
-        self.admin_service.update_admin(admin.id, {"refresh_token": None}, session)
+        await self.admin_service.update_admin(admin.id, {"refresh_token": None}, session)
 
         if admin.id is None:
             return ErrorResponse(message="Admin not found", status_code=404)
@@ -128,7 +132,9 @@ class AdminAuthController:
         refresh_token = self.admin_auth_service.create_refresh_token(payload)
 
         if admin.id is not None:
-            self.admin_service.update_admin(admin.id, {"refresh_token": refresh_token}, session)
+            await self.admin_service.update_admin(
+                admin.id, {"refresh_token": refresh_token}, session
+            )
 
         response = SuccessResponse(
             message="Token refreshed successfully",

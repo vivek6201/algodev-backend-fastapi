@@ -1,8 +1,9 @@
+import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import Request
-from sqlmodel import Session
+from fastapi import BackgroundTasks, Request
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
 from app.config.settings import settings
@@ -17,24 +18,25 @@ class AuthController:
         self.auth_service = AuthService()
         self.user_service = UserService()
 
-    def signup(self, data: Signup, session: Session):
-        if data.password != data.confirm_password:
-            return ErrorResponse(
-                message="Password and confirm password do not match", status_code=400
-            )
-
-        user = self.user_service.get_user(session, email=data.email)
-
-        if not user:
-            user = self.user_service.get_user(session, username=data.username)
-
-        if user:
-            return ErrorResponse(
-                message="User with this email or username already exists",
-                status_code=400,
-            )
-
+    async def signup(self, data: Signup, session: AsyncSession, background_tasks: BackgroundTasks):
         try:
+            if data.password != data.confirm_password:
+                return ErrorResponse(
+                    message="Password and confirm password do not match", status_code=400
+                )
+
+            # Check if user already exists by email or username
+            existing_user_by_email = await self.user_service.get_user(session, email=data.email)
+            if existing_user_by_email:
+                return ErrorResponse(message="Email already registered", status_code=400)
+
+            existing_user_by_username = await self.user_service.get_user(
+                session, username=data.username
+            )
+            if existing_user_by_username:
+                return ErrorResponse(message="Username already taken", status_code=400)
+
+            # Create new user
             hashed_password = self.auth_service.hash_password(data.password)
             user_data = {
                 "first_name": data.first_name,
@@ -43,21 +45,18 @@ class AuthController:
                 "password": hashed_password,
                 "username": data.username,
             }
+            new_user = await self.user_service.create_user(user_data, session)
 
-            new_user = self.user_service.create_user(user_data, session)
-
-            if new_user.id is None:
-                session.rollback()
-                return ErrorResponse(
-                    message="Failed to create user: missing user ID", status_code=400
-                )
+            if new_user is None or new_user.id is None:
+                await session.rollback()
+                return ErrorResponse(message="Failed to create user", status_code=500)
 
             # Generate verification token
-            verification_token = self.auth_service.generate_verification_token()
+            verification_token = secrets.token_urlsafe(32)
             verification_expires = datetime.now() + timedelta(hours=24)
 
-            # Update user with verification token
-            self.user_service.update_user(
+            # Store verification token
+            await self.user_service.update_user(
                 new_user.id,
                 {
                     "verification_token": verification_token,
@@ -69,7 +68,7 @@ class AuthController:
             # Send verification email
             template_path = Path("app/modules/common/email-templates/verify-email.html")
             if not template_path.exists():
-                session.rollback()
+                await session.rollback()
                 return ErrorResponse(message="Email template not found", status_code=500)
 
             template_content = template_path.read_text(encoding="utf-8")
@@ -82,14 +81,16 @@ class AuthController:
                 "{{name}}", f"{new_user.first_name} {new_user.last_name}"
             )
             html_content = html_content.replace("{{verify_link}}", verification_link)
-            email_service.send_mail(
+
+            background_tasks.add_task(
+                email_service.send_mail,
                 recievers_list=[new_user.email],
                 subject="Verify your email - Algorithmic Dev",
                 html=html_content,
             )
 
             # Commit the transaction only after all operations succeed
-            session.commit()
+            await session.commit()
 
             return SuccessResponse(
                 message="User created successfully. Please verify your email.",
@@ -102,15 +103,15 @@ class AuthController:
                 status_code=201,
             )
         except Exception as e:
-            session.rollback()
-            return ErrorResponse(message=str(e), status_code=500)
+            await session.rollback()
+            return ErrorResponse(message="Signup failed", error=e, status_code=500)
 
-    def login(self, data: Login, session: Session):
+    async def login(self, data: Login, session: AsyncSession):
         user = None
         if data.email:
-            user = self.user_service.get_user(session, email=data.email)
+            user = await self.user_service.get_user(session, email=data.email)
         if data.username:
-            user = self.user_service.get_user(session, username=data.username)
+            user = await self.user_service.get_user(session, username=data.username)
 
         if not user:
             return ErrorResponse(message="User not found", status_code=404)
@@ -134,7 +135,7 @@ class AuthController:
         refresh_token = self.auth_service.create_refresh_token(payload)
 
         if user.id is not None:
-            self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
+            await self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
 
         # Create response object
         response = SuccessResponse(
@@ -156,7 +157,7 @@ class AuthController:
             samesite="none",
             domain=settings.DOMAIN,
             path="/",
-            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+            max_age=settings.ACCESS_TOKEN_EXPIRE_SECONDS,
         )
         response.set_cookie(
             key="refresh_token",
@@ -166,18 +167,18 @@ class AuthController:
             samesite="none",
             domain=settings.DOMAIN,
             path="/",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_SECONDS,
         )
 
         return response
 
-    def logout(self, session: Session, current_user: TokenPayload):
-        user = self.user_service.get_user(session, user_id=current_user.id)
+    async def logout(self, session: AsyncSession, current_user: TokenPayload):
+        user = await self.user_service.get_user(session, user_id=current_user.id)
         if not user:
             return ErrorResponse(message="User not found", status_code=404)
 
         if user.id is not None:
-            self.user_service.update_user(user.id, {"refresh_token": None}, session)
+            await self.user_service.update_user(user.id, {"refresh_token": None}, session)
 
         # Create response object
         response = SuccessResponse(
@@ -190,10 +191,10 @@ class AuthController:
 
         return response
 
-    def verify_email(self, token: str, session: Session):
+    async def verify_email(self, token: str, session: AsyncSession):
         """Verify user email using verification token"""
         # Find user with this verification token
-        user = self.user_service.get_user(session, verification_token=token)
+        user = await self.user_service.get_user(session, verification_token=token)
 
         if not user:
             return ErrorResponse(message="Invalid verification token", status_code=400)
@@ -204,7 +205,7 @@ class AuthController:
 
         # Mark email as verified and clear verification token
         if user.id is not None:
-            self.user_service.update_user(
+            await self.user_service.update_user(
                 user.id,
                 {
                     "email_verified": True,
@@ -218,7 +219,7 @@ class AuthController:
             message="Email verified successfully. You can now log in.", status_code=200
         )
 
-    def refresh(self, session: Session, request: Request):
+    async def refresh(self, session: AsyncSession, request: Request):
         """Refresh access and refresh tokens using a valid refresh token"""
 
         # Check cookies first, then fall back to headers
@@ -236,7 +237,7 @@ class AuthController:
             return ErrorResponse(message="Refresh token has expired", status_code=401)
 
         # Get user from database
-        user = self.user_service.get_user(session=session, user_id=curr_user.id)
+        user = await self.user_service.get_user(session=session, user_id=curr_user.id)
 
         # Validate refresh token
         if not user or user.refresh_token is None:
@@ -248,7 +249,7 @@ class AuthController:
 
         # TOKEN ROTATION: Invalidate old refresh token immediately
         # This prevents token replay attacks
-        self.user_service.update_user(user.id, {"refresh_token": None}, session)
+        await self.user_service.update_user(user.id, {"refresh_token": None}, session)
 
         # Ensure user ID is present
         if user.id is None:
@@ -261,7 +262,7 @@ class AuthController:
         refresh_token = self.auth_service.create_refresh_token(payload)
 
         # Update refresh token in database
-        self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
+        await self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
 
         # Create response object
         response = SuccessResponse(
@@ -285,7 +286,7 @@ class AuthController:
             samesite="none",
             domain=settings.DOMAIN,
             path="/",
-            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,  # 1 hour
+            max_age=settings.ACCESS_TOKEN_EXPIRE_SECONDS,  # 1 hour
         )
         response.set_cookie(
             key="refresh_token",
@@ -295,7 +296,7 @@ class AuthController:
             domain=settings.DOMAIN,
             samesite="none",
             path="/",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,  # 7 days
+            max_age=settings.REFRESH_TOKEN_EXPIRE_SECONDS,  # 7 days
         )
 
         return response

@@ -1,4 +1,14 @@
 services:
+  redis:
+    image: redis:7
+    container_name: algorithmicdev-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+
   algorithmicdev-backend:
     image: vivek6201/algorithmicdev_backend:latest
     container_name: algorithmicdev-backend
@@ -12,6 +22,10 @@ services:
     environment:
       - UV_CACHE_DIR=/app/.cache/uv
       - UV_NO_CACHE=1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
     networks:
       - app-network
     healthcheck:
@@ -20,6 +34,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+volumes:
+  redis-data:
+
 
 networks:
   app-network:

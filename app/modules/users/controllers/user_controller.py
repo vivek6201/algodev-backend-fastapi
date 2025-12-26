@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.modules.users.schemas.user_validation import UserUpdate
 from app.modules.users.services.user_service import UserService
@@ -8,8 +8,8 @@ class UserController:
     def __init__(self):
         self.user_service = UserService()
 
-    def get_user(self, user_id: int, session: Session):
-        user = self.user_service.get_user(session, user_id=user_id)
+    async def get_user(self, user_id: int, session: AsyncSession):
+        user = await self.user_service.get_user(session, user_id=user_id)
         if not user:
             return None
         response_data = {
@@ -23,8 +23,8 @@ class UserController:
         }
         return response_data
 
-    def update_user(self, user_id: int, user_data: UserUpdate, session: Session):
-        user = self.user_service.update_user(
+    async def update_user(self, user_id: int, user_data: UserUpdate, session: AsyncSession):
+        user = await self.user_service.update_user(
             user_id=user_id, update_data=user_data.model_dump(exclude_unset=True), session=session
         )
         if not user:
@@ -40,5 +40,5 @@ class UserController:
         }
         return response_data
 
-    def delete_user(self, user_id: int, session: Session):
-        return self.user_service.delete_user(user_id=user_id, session=session)
+    async def delete_user(self, user_id: int, session: AsyncSession):
+        return await self.user_service.delete_user(user_id=user_id, session=session)

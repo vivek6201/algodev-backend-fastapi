@@ -8,8 +8,8 @@ common_controller = CommonController()
 
 
 @common_router.post("/upload")
-def upload_file(file: UploadFile = File(...)):
-    return common_controller.upload_file(
+async def upload_file(file: UploadFile = File(...)):
+    return await common_controller.upload_file(
         file=file.file, content_type=file.content_type, object_name=file.filename
     )
 

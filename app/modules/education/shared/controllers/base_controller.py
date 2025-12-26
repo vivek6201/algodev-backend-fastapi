@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse
@@ -12,18 +12,18 @@ class BaseEducationController:
         self.service = EducationService()
         self.reaction_service = ReactionService()
 
-    def get_categories(self, session: Session):
+    async def get_categories(self, session: AsyncSession):
         try:
-            categories = self.service.get_categories(session=session)
+            categories = await self.service.get_categories(session=session)
             return SuccessResponse(message="Categories fetched successfully", data=categories)
         except Exception as e:
             return ErrorResponse(
                 message="Failed to fetch categories", error=e, status_code=HTTP_400_BAD_REQUEST
             )
 
-    def get_user_reaction(self, session: Session, content_slug: str, user_id: int):
+    async def get_user_reaction(self, session: AsyncSession, content_slug: str, user_id: int):
         try:
-            result = self.reaction_service.get_user_reaction(
+            result = await self.reaction_service.get_user_reaction(
                 session=session,
                 content_slug=content_slug,
                 user_id=user_id,

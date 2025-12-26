@@ -1,7 +1,9 @@
 from typing import Optional
 
-from sqlmodel import Session, func, select
+from sqlmodel import func, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
 from app.modules.education.shared.model import (
     ReactionType,
     UserReaction,
@@ -11,9 +13,10 @@ from app.modules.education.shared.model import (
 class ReactionService:
     """Reusable service for handling user reactions on any content"""
 
-    def get_user_reaction(
+    @cached(key_prefix="reactions", tags=["reaction_{content_slug}"], response_model=UserReaction)
+    async def get_user_reaction(
         self,
-        session: Session,
+        session: AsyncSession,
         user_id: int,
         content_slug: str,
     ) -> Optional[UserReaction]:
@@ -22,11 +25,13 @@ class ReactionService:
             UserReaction.user_id == user_id,
             UserReaction.content_slug == content_slug,
         )
-        return session.exec(statement).first()
+        result = await session.exec(statement)
+        return result.first()
 
-    def toggle_reaction(
+    @invalidate_cache(tags=["reaction_{content_slug}", "reaction_counts_{content_slug}"])
+    async def toggle_reaction(
         self,
-        session: Session,
+        session: AsyncSession,
         user_id: int,
         content_slug: str,
         reaction_type: ReactionType,
@@ -37,14 +42,14 @@ class ReactionService:
         - If same reaction exists: remove it (toggle off)
         - If different reaction exists: switch it
         """
-        existing = self.get_user_reaction(session, user_id, content_slug)
+        existing = await self.get_user_reaction(session, user_id, content_slug)
         result = {"action": None, "current_reaction": None, "previous_reaction": None}
 
         if existing:
             result["previous_reaction"] = existing.reaction.value
             if existing.reaction == reaction_type:
                 # Same reaction → remove (toggle off)
-                session.delete(existing)
+                await session.delete(existing)
                 result["action"] = "removed"
                 result["current_reaction"] = None
             else:
@@ -64,21 +69,23 @@ class ReactionService:
             result["action"] = "added"
             result["current_reaction"] = reaction_type.value
 
-        session.commit()
+        await session.commit()
         return result
 
-    def get_reaction_counts(
+    @cached(key_prefix="reactions", tags=["reaction_counts_{content_slug}"], response_model=dict)
+    async def get_reaction_counts(
         self,
-        session: Session,
+        session: AsyncSession,
         content_slug: str,
-    ) -> dict:
+    ):
         """Get like/dislike counts for specific content"""
         statement = (
             select(UserReaction.reaction, func.count(UserReaction.id))
             .where(UserReaction.content_slug == content_slug)
             .group_by(UserReaction.reaction)
         )
-        results = session.exec(statement).all()
+        result = await session.exec(statement)
+        results = result.all()
 
         counts = {"likes": 0, "dislikes": 0}
         for reaction, count in results:

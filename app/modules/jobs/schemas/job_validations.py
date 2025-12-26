@@ -86,3 +86,25 @@ class JobResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CompactJobResponse(BaseModel):
+    """Short job response schema"""
+
+    id: int
+    title: str
+    slug: str
+    location: str
+    job_type: JobType
+    job_mode: JobMode
+    min_salary: int
+    max_salary: int
+    listing_type: ListingType
+    company_name: str
+    status: JobStatus
+    company_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

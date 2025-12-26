@@ -1,8 +1,12 @@
+import math
 from typing import Optional
 
 from sqlalchemy.orm.strategy_options import selectinload
-from sqlmodel import Session, func, select
+from sqlmodel import func, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
+from app.common.lib.formatter import ListResponse
 from app.modules.common.services.s3_service import S3Service
 from app.modules.education.blogs.schema.blogs import BlogResponse
 from app.modules.education.shared.model import ReactionType
@@ -16,9 +20,9 @@ class BaseBlogService:
         self.s3_service = S3Service()
         self.reaction_service = ReactionService()
 
-    def get_blog_instance(
+    async def get_blog_instance(
         self,
-        session: Session,
+        session: AsyncSession,
         blog_id: Optional[int] = None,
         blog_slug: Optional[str] = None,
         status: Optional[BlogStatus] = None,
@@ -41,18 +45,22 @@ class BaseBlogService:
         if load_categories:
             statement = statement.options(selectinload(Blog.categories))
 
-        blog = session.exec(statement).one_or_none()
+        result = await session.exec(statement)
+        blog = result.one_or_none()
 
         return blog
 
-    def get_blog_with_details(
+    @cached(
+        key_prefix="blogs", tags=["blog_{blog_id}", "blog_{blog_slug}"], response_model=BlogResponse
+    )
+    async def get_blog_with_details(
         self,
-        session: Session,
+        session: AsyncSession,
         blog_slug: Optional[str] = None,
         blog_id: Optional[int] = None,
         status: Optional[BlogStatus] = None,
     ):
-        blog = self.get_blog_instance(
+        blog = await self.get_blog_instance(
             session=session,
             blog_slug=blog_slug,
             blog_id=blog_id,
@@ -67,19 +75,20 @@ class BaseBlogService:
         blog_dict["categories"] = blog.categories
 
         if blog.thumbnail_id:
-            thumbnail = self.s3_service.get_file(object_name=blog.thumbnail_id)
+            thumbnail = await self.s3_service.get_file(object_name=blog.thumbnail_id)
             if thumbnail:
                 blog_dict["thumbnail"] = thumbnail
         return BlogResponse(**blog_dict)
 
-    def get_blogs(
+    @cached(key_prefix="blogs", tags=["blogs_list"], response_model=ListResponse[BlogResponse])
+    async def get_blogs(
         self,
-        session: Session,
+        session: AsyncSession,
         page: int,
         limit: int,
         status: Optional[BlogStatus] = None,
         search: Optional[str] = None,
-    ):
+    ) -> ListResponse[BlogResponse]:
         statement = select(Blog)
 
         if status:
@@ -88,65 +97,62 @@ class BaseBlogService:
         if search:
             statement = statement.where(Blog.title.contains(f"%{search}%"))
 
-        total_items = session.exec(select(func.count()).select_from(statement.subquery())).one()
+        count_result = await session.exec(select(func.count()).select_from(statement.subquery()))
+        total_items = count_result.one()
 
-        blogs = session.exec(
+        result = await session.exec(
             statement.order_by(Blog.updated_at.desc()).offset((page - 1) * limit).limit(limit)
-        ).all()
+        )
+        blogs = result.all()
 
         blogs_data = []
         for blog in blogs:
             blog_dict = blog.model_dump()
             if blog.thumbnail_id:
-                thumbnail = self.s3_service.get_file(object_name=blog.thumbnail_id)
+                thumbnail = await self.s3_service.get_file(object_name=blog.thumbnail_id)
                 if thumbnail:
                     blog_dict["thumbnail"] = thumbnail
 
             blog_dict = BlogResponse(**blog_dict)
             blogs_data.append(blog_dict)
 
-        return blogs_data, total_items
-
-    def get_blog_metadata(
-        self, session: Session, blog_slug: str, user_id: Optional[int] = None
-    ) -> Optional[dict]:
-        """Get blog reaction counts"""
-        blog = self.get_blog_instance(session=session, blog_slug=blog_slug)
-
-        if not blog:
-            return None
-
-        counts = self.reaction_service.get_reaction_counts(
-            session=session,
-            content_slug=blog.slug,
+        return ListResponse[BlogResponse](
+            data=blogs_data,
+            total_items=total_items,
+            total_pages=math.ceil(total_items / limit) if limit > 0 else 1,
         )
 
-        res = {
-            "likes": counts["likes"],
-            "dislikes": counts["dislikes"],
-        }
+    @cached(key_prefix="blogs", tags=["blog_metadata_{blog_slug}"], response_model=dict)
+    async def get_blog_metadata(self, session: AsyncSession, blog_slug: str, user_id: int = None):
+        try:
+            user_reaction = None
+            if user_id:
+                user_reaction = await self.reaction_service.get_user_reaction(
+                    session=session, content_slug=blog_slug, user_id=user_id
+                )
 
-        if user_id:
-            user_reaction = self.reaction_service.get_user_reaction(
-                session=session,
-                content_slug=blog.slug,
-                user_id=user_id,
+            reaction_counts = await self.reaction_service.get_reaction_counts(
+                session=session, content_slug=blog_slug
             )
 
-            if user_reaction:
-                res["current_reaction"] = user_reaction.reaction
+            return {
+                "current_reaction": user_reaction.reaction,
+                "likes": reaction_counts["likes"],
+                "dislikes": reaction_counts["dislikes"],
+            }
+        except Exception as e:
+            raise e
 
-        return res
-
-    def toggle_blog_reaction(
+    @invalidate_cache(tags=["blog_metadata_{blog_slug}"])
+    async def toggle_blog_reaction(
         self,
-        session: Session,
+        session: AsyncSession,
         blog_slug: str,
         user_id: int,
         action: str,
     ) -> Optional[dict]:
         """Toggle a reaction on a blog"""
-        blog = self.get_blog_instance(session=session, blog_slug=blog_slug)
+        blog = await self.get_blog_instance(session=session, blog_slug=blog_slug)
 
         if not blog:
             return None
@@ -155,7 +161,7 @@ class BaseBlogService:
         reaction_type = ReactionType.LIKE if action == "like" else ReactionType.DISLIKE
 
         # Toggle reaction using content_slug
-        result = self.reaction_service.toggle_reaction(
+        result = await self.reaction_service.toggle_reaction(
             session=session,
             user_id=user_id,
             content_slug=blog.slug,
@@ -163,7 +169,7 @@ class BaseBlogService:
         )
 
         # Get fresh counts from UserReaction table
-        counts = self.reaction_service.get_reaction_counts(
+        counts = await self.reaction_service.get_reaction_counts(
             session=session,
             content_slug=blog.slug,
         )

@@ -1,53 +1,61 @@
 from typing import List, Optional
 
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
 from app.modules.users.models.user import Users
 
 
 class UserService:
-    def create_user(self, user_data: dict, session: Session) -> Users:
+    @invalidate_cache(tags=["users_list"])
+    async def create_user(self, user_data: dict, session: AsyncSession) -> Users:
         try:
             user = Users(**user_data)
             session.add(user)
-            session.flush()
-            session.refresh(user)
+            await session.flush()
+            await session.refresh(user)
             return user
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
 
-    def delete_user(self, user_id: int, session: Session) -> bool:
+    @invalidate_cache(tags=["users_list"])
+    async def delete_user(self, user_id: int, session: AsyncSession) -> bool:
         try:
-            user = session.get(Users, user_id)
+            user = await session.get(Users, user_id)
             if not user:
                 return False
-            session.delete(user)
-            session.commit()
+            await session.delete(user)
+            await session.commit()
             return True
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
         return True
 
-    def update_user(self, user_id: int, update_data: dict, session: Session) -> Optional[Users]:
+    @invalidate_cache(tags=["user_{user_id}", "users_list"])
+    async def update_user(
+        self, user_id: int, update_data: dict, session: AsyncSession
+    ) -> Optional[Users]:
         try:
-            user = session.get(Users, user_id)
+            user = await session.get(Users, user_id)
             if not user:
                 return None
             for key, value in update_data.items():
                 setattr(user, key, value)
             session.add(user)
-            session.flush()
-            session.refresh(user)
+            await session.flush()
+            await session.refresh(user)
             return user
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
 
-    def get_user(
+    @cached(key_prefix="users", tags=["user_{user_id}"], response_model=Users)
+    async def get_user(
         self,
-        session: Session,
+        session: AsyncSession,
         user_id: Optional[int] = None,
         email: Optional[str] = None,
         username: Optional[str] = None,
@@ -55,23 +63,28 @@ class UserService:
     ) -> Optional[Users]:
         try:
             if user_id:
-                return session.get(Users, user_id)
+                return await session.get(Users, user_id)
             if email:
-                return session.exec(select(Users).where(Users.email == email)).first()
+                result = await session.exec(select(Users).where(Users.email == email))
+                return result.first()
             if username:
-                return session.exec(select(Users).where(Users.username == username)).first()
+                result = await session.exec(select(Users).where(Users.username == username))
+                return result.first()
             if verification_token:
-                return session.exec(
+                result = await session.exec(
                     select(Users).where(Users.verification_token == verification_token)
-                ).first()
+                )
+                return result.first()
             return None
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
 
-    def get_all_users(self, session: Session) -> List[Users]:
+    @cached(key_prefix="users", tags=["users_list"], response_model=list[Users])
+    async def get_all_users(self, session: AsyncSession) -> List[Users]:
         try:
-            return list(session.exec(select(Users)))
+            result = await session.exec(select(Users))
+            return list(result.all())
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e

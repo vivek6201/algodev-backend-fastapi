@@ -12,7 +12,7 @@ dependencies = [
     "pydantic",
     "sqlmodel",
     "pydantic-settings",
-    "psycopg2-binary",
+    "asyncpg",
     "alembic",
     "python-jose",
     "bcrypt",
@@ -21,6 +21,7 @@ dependencies = [
     "resend",
     "boto3",
     "cryptography",
+    "redis",
 ]
 
 [project.optional-dependencies]

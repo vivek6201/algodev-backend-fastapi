@@ -1,4 +1,3 @@
-import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -69,7 +68,7 @@ class AuthService:
     def create_access_token(self, data: TokenPayload, expires_delta: Optional[timedelta] = None):
         to_encode = data.__dict__.copy()
         expire = datetime.now() + (
-            expires_delta or timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expires_delta or timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_SECONDS)
         )
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(
@@ -81,7 +80,7 @@ class AuthService:
     def create_refresh_token(self, data: TokenPayload, expires_delta: Optional[timedelta] = None):
         to_encode = data.__dict__.copy()
         expire = datetime.now() + (
-            expires_delta or timedelta(minutes=self.settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+            expires_delta or timedelta(minutes=self.settings.REFRESH_TOKEN_EXPIRE_SECONDS)
         )
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(
@@ -106,7 +105,3 @@ class AuthService:
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-    def generate_verification_token(self) -> str:
-        """Generate a secure random verification token"""
-        return secrets.token_urlsafe(32)

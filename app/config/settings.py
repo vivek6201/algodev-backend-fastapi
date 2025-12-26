@@ -17,12 +17,16 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = ""
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
+    ACCESS_TOKEN_EXPIRE_SECONDS: int = 60 * 60 * 24
+    REFRESH_TOKEN_EXPIRE_SECONDS: int = 60 * 60 * 24 * 7
     ALGORITHM: str = "HS256"
 
     # Database
     DATABASE_URL: str = ""
+
+    @property
+    def ASYNC_DATABASE_URL(self) -> str:
+        return self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 
     # Redis (optional)
     REDIS_URL: Optional[str] = None
@@ -36,6 +40,10 @@ class Settings(BaseSettings):
     AWS_REGION: Optional[str] = None
     AWS_S3_BUCKET: Optional[str] = None
     AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
+
+    # Redis
+    REDIS_HOST: Optional[str] = "localhost"
+    REDIS_PORT: Optional[int] = 6379
 
     # CORS - parsed from comma-separated string in .env
     CORS_ORIGINS: list[str] = [

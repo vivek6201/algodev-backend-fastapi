@@ -1,8 +1,10 @@
 from uuid import uuid4
 
 from slugify import slugify
-from sqlmodel import Session, select
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import invalidate_cache
 from app.modules.education.blogs.schema.blogs import CreateBlog, UpdateBlog
 from app.modules.education.shared.model import EducationCategory
 
@@ -11,20 +13,22 @@ from .base_service import BaseBlogService
 
 
 class AdminBlogService(BaseBlogService):
-    def create_blog(self, session: Session, blog_data: CreateBlog):
+    @invalidate_cache(tags=["blogs_list"])
+    async def create_blog(self, session: AsyncSession, blog_data: CreateBlog):
         if not blog_data.slug:
             base_slug = slugify(blog_data.title)
             unique_suffix = str(uuid4().hex)[:6]
             blog_data.slug = f"{base_slug}-{unique_suffix}"
 
-        blog = self.get_blog_instance(session=session, blog_slug=blog_data.slug)
+        blog = await self.get_blog_instance(session=session, blog_slug=blog_data.slug)
 
         if blog:
             return None
 
-        categories = session.exec(
+        result = await session.exec(
             select(EducationCategory).where(EducationCategory.id.in_(blog_data.categories))
-        ).all()
+        )
+        categories = result.all()
 
         blog_dict = blog_data.model_dump(exclude={"categories"})
 
@@ -33,15 +37,18 @@ class AdminBlogService(BaseBlogService):
 
         try:
             session.add(blog)
-            session.commit()
-            session.refresh(blog)
+            await session.commit()
+            await session.refresh(blog)
             return blog
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e
 
-    def update_blog(self, session: Session, blog_slug: str, blog_data: UpdateBlog):
-        blog = self.get_blog_instance(session=session, blog_slug=blog_slug)
+    @invalidate_cache(tags=["blogs_list", "blog_{blog_slug}"])
+    async def update_blog(self, session: AsyncSession, blog_slug: str, blog_data: UpdateBlog):
+        blog = await self.get_blog_instance(
+            session=session, blog_slug=blog_slug, load_categories=True
+        )
 
         if not blog:
             return None
@@ -50,17 +57,18 @@ class AdminBlogService(BaseBlogService):
 
         try:
             if blog_data.categories is not None:
-                categories = session.exec(
+                result = await session.exec(
                     select(EducationCategory).where(EducationCategory.id.in_(blog_data.categories))
-                ).all()
+                )
+                categories = result.all()
                 blog.categories.clear()
                 blog.categories.extend(categories)
 
             blog.sqlmodel_update(blog_dict)
             session.add(blog)
-            session.commit()
-            session.refresh(blog)
+            await session.commit()
+            await session.refresh(blog)
             return blog
         except Exception as e:
-            session.rollback()
+            await session.rollback()
             raise e

@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Request
-from sqlmodel import Session
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.db.config import get_session
 from app.common.lib.formatter import TokenPayload
@@ -14,29 +14,35 @@ admin_auth_controller = AdminAuthController()
 
 
 @auth_router.post("/login")
-def login(body: Login, session: Session = Depends(get_session)):
-    return auth_controller.login(body, session)
+async def login(body: Login, session: AsyncSession = Depends(get_session)):
+    return await auth_controller.login(body, session)
 
 
-@auth_router.post("/signup")
-def signup(body: Signup, session: Session = Depends(get_session)):
-    return auth_controller.signup(body, session)
+@auth_router.post("/signup", tags=["Auth"])
+async def signup(
+    signup_data: Signup,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+):
+    return await auth_controller.signup(
+        data=signup_data, session=session, background_tasks=background_tasks
+    )
 
 
 @auth_router.post("/refresh")
-async def refresh_token(request: Request, session: Session = Depends(get_session)):
-    return auth_controller.refresh(session, request)
+async def refresh_token(request: Request, session: AsyncSession = Depends(get_session)):
+    return await auth_controller.refresh(session, request)
 
 
 @auth_router.delete("/logout")
-def logout(
-    session: Session = Depends(get_session),
+async def logout(
+    session: AsyncSession = Depends(get_session),
     current_user: TokenPayload = Depends(RoleChecker(ALL_USER_ROLES)),
 ):
-    return auth_controller.logout(session=session, current_user=current_user)
+    return await auth_controller.logout(session=session, current_user=current_user)
 
 
 @auth_router.get("/verify-email/{token}")
-def verify_email_link(token: str, session: Session = Depends(get_session)):
+async def verify_email_link(token: str, session: AsyncSession = Depends(get_session)):
     """Verify email via clickable link"""
-    return auth_controller.verify_email(token, session)
+    return await auth_controller.verify_email(token, session)

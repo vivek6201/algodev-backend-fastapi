@@ -1,6 +1,6 @@
 from typing import Optional
 
-from sqlmodel import Session
+from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_404_NOT_FOUND
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse
@@ -13,15 +13,16 @@ class BaseBlogController:
     def __init__(self):
         self.base_service = BaseBlogService()
 
-    def get_blogs(self, session: Session, params: Optional[dict] = None):
+    async def get_blogs(self, session: AsyncSession, params: Optional[dict] = None):
         try:
-            blogs, total_items = self.base_service.get_blogs(session=session, **params)
+            result = await self.base_service.get_blogs(session=session, **params)
 
             data = {
-                "data": blogs,
+                "data": result.data,
                 "page": params.get("page", 1),
                 "limit": params.get("limit", 10),
-                "total_items": total_items,
+                "total_items": result.total_items,
+                "total_pages": result.total_pages,
             }
 
             return SuccessResponse(message="Blogs fetched successfully", data=data)
@@ -30,9 +31,9 @@ class BaseBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def get_blog(self, session: Session, blog_slug: str):
+    async def get_blog(self, session: AsyncSession, blog_slug: str):
         try:
-            blog = self.base_service.get_blog_with_details(
+            blog = await self.base_service.get_blog_with_details(
                 session=session, blog_slug=blog_slug, status=BlogStatus.PUBLISHED
             )
 
@@ -44,23 +45,27 @@ class BaseBlogController:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def get_blog_metadata(self, session: Session, blog_slug: str, user_id: Optional[int] = None):
+    async def get_blog_metadata(
+        self, session: AsyncSession, blog_slug: str, user_id: Optional[int] = None
+    ):
         try:
-            blog = self.base_service.get_blog_metadata(
+            metadata = await self.base_service.get_blog_metadata(
                 session=session, blog_slug=blog_slug, user_id=user_id
             )
 
-            if not blog:
-                return ErrorResponse(message="Blog not found", status_code=HTTP_404_NOT_FOUND)
+            if not metadata:
+                return ErrorResponse(message="No metadata found", status_code=HTTP_404_NOT_FOUND)
 
-            return SuccessResponse(message="Blog metadata fetched successfully", data=blog)
+            return SuccessResponse(message="Blog metadata fetched successfully", data=metadata)
         except Exception as e:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))
 
-    def update_blog_reaction(self, session: Session, blog_slug: str, user_id: int, action: str):
+    async def update_blog_reaction(
+        self, session: AsyncSession, blog_slug: str, user_id: int, action: str
+    ):
         try:
-            result = self.base_service.toggle_blog_reaction(
+            result = await self.base_service.toggle_blog_reaction(
                 session=session, blog_slug=blog_slug, user_id=user_id, action=action
             )
 

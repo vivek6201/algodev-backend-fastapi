@@ -95,7 +95,7 @@ class Job(JobBase, table=True):
 
     company_id: Optional[int] = Field(default=None, foreign_key="company.id")
     company_rel: Optional[Company] = Relationship(back_populates="jobs")
-    status: JobStatus = pg_enum(JobStatus, default=JobStatus.DRAFT)
+    status: JobStatus = pg_enum(JobStatus, default=JobStatus.DRAFT, nullable=False)
 
     applications: List["JobApplication"] = Relationship(back_populates="job")
 
