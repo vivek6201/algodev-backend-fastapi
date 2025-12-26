@@ -1,4 +1,5 @@
 import logging
+import ssl
 from typing import Generator
 
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -16,6 +17,7 @@ engine = create_async_engine(
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=5,  # Number of connections to maintain
     max_overflow=10,  # Maximum number of connections beyond pool_size
+    connect_args={"ssl": ssl.create_default_context()},
 )
 
 # Create session factory
