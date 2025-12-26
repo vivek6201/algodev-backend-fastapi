@@ -157,7 +157,7 @@ class AuthController:
             samesite="none",
             domain=settings.DOMAIN,
             path="/",
-            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,
+            max_age=settings.ACCESS_TOKEN_EXPIRE_SECONDS,
         )
         response.set_cookie(
             key="refresh_token",
@@ -167,7 +167,7 @@ class AuthController:
             samesite="none",
             domain=settings.DOMAIN,
             path="/",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,
+            max_age=settings.REFRESH_TOKEN_EXPIRE_SECONDS,
         )
 
         return response
@@ -286,7 +286,7 @@ class AuthController:
             samesite="none",
             domain=settings.DOMAIN,
             path="/",
-            max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES,  # 1 hour
+            max_age=settings.ACCESS_TOKEN_EXPIRE_SECONDS,  # 1 hour
         )
         response.set_cookie(
             key="refresh_token",
@@ -296,7 +296,7 @@ class AuthController:
             domain=settings.DOMAIN,
             samesite="none",
             path="/",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_MINUTES,  # 7 days
+            max_age=settings.REFRESH_TOKEN_EXPIRE_SECONDS,  # 7 days
         )
 
         return response

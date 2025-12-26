@@ -1,9 +1,12 @@
+import math
 from typing import Optional
 
 from sqlalchemy.orm.strategy_options import selectinload
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
+from app.common.lib.formatter import ListResponse
 from app.modules.common.services.s3_service import S3Service
 from app.modules.education.blogs.schema.blogs import BlogResponse
 from app.modules.education.shared.model import ReactionType
@@ -47,6 +50,9 @@ class BaseBlogService:
 
         return blog
 
+    @cached(
+        key_prefix="blogs", tags=["blog_{blog_id}", "blog_{blog_slug}"], response_model=BlogResponse
+    )
     async def get_blog_with_details(
         self,
         session: AsyncSession,
@@ -74,6 +80,7 @@ class BaseBlogService:
                 blog_dict["thumbnail"] = thumbnail
         return BlogResponse(**blog_dict)
 
+    @cached(key_prefix="blogs", tags=["blogs_list"], response_model=ListResponse[BlogResponse])
     async def get_blogs(
         self,
         session: AsyncSession,
@@ -81,7 +88,7 @@ class BaseBlogService:
         limit: int,
         status: Optional[BlogStatus] = None,
         search: Optional[str] = None,
-    ):
+    ) -> ListResponse[BlogResponse]:
         statement = select(Blog)
 
         if status:
@@ -109,8 +116,13 @@ class BaseBlogService:
             blog_dict = BlogResponse(**blog_dict)
             blogs_data.append(blog_dict)
 
-        return blogs_data, total_items
+        return ListResponse[BlogResponse](
+            data=blogs_data,
+            total_items=total_items,
+            total_pages=math.ceil(total_items / limit) if limit > 0 else 1,
+        )
 
+    @cached(key_prefix="blogs", tags=["blog_metadata_{blog_slug}"], response_model=dict)
     async def get_blog_metadata(self, session: AsyncSession, blog_slug: str, user_id: int = None):
         try:
             user_reaction = None
@@ -131,6 +143,7 @@ class BaseBlogService:
         except Exception as e:
             raise e
 
+    @invalidate_cache(tags=["blog_metadata_{blog_slug}"])
     async def toggle_blog_reaction(
         self,
         session: AsyncSession,

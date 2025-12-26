@@ -5,11 +5,19 @@ from sqlalchemy.orm.strategy_options import selectinload
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached
+from app.common.lib.formatter import ListResponse
 from app.modules.jobs.models.jobs import Category, Job, JobStatus, ListingType
-from app.modules.jobs.schemas.job_validations import JobResponse
+from app.modules.jobs.schemas.category_validations import CategoryResponse
+from app.modules.jobs.schemas.job_validations import CompactJobResponse, JobResponse
 
 
 class BaseJobService:
+    @cached(
+        key_prefix="jobs",
+        tags=["jobs_list"],
+        response_model=ListResponse[CompactJobResponse],
+    )
     async def list_jobs(
         self,
         session: AsyncSession,
@@ -18,7 +26,7 @@ class BaseJobService:
         status: Optional[JobStatus] = None,
         type: ListingType | None = None,
         search: Optional[str] = None,
-    ):
+    ) -> ListResponse[CompactJobResponse]:
         query = select(Job)
         count_query = select(func.count()).select_from(Job)
 
@@ -41,11 +49,11 @@ class BaseJobService:
             query = query.offset((page - 1) * limit).limit(limit)
 
         result = await session.exec(query)
-        return {
-            "jobs": result.all(),
-            "total_items": total_items,
-            "total_pages": total_pages,
-        }
+        return ListResponse[CompactJobResponse](
+            data=result.all(),
+            total_items=total_items,
+            total_pages=total_pages,
+        )
 
     async def get_job_instance(
         self, session: AsyncSession, job_slug: str, status: JobStatus | None = None
@@ -65,12 +73,22 @@ class BaseJobService:
             print(e)
             return None
 
+    @cached(
+        key_prefix="jobs",
+        tags=["job_{job_slug}"],
+        response_model=JobResponse,
+    )
     async def get_job(
         self, session: AsyncSession, job_slug: str, status: JobStatus | None = None
     ) -> JobResponse | None:
         job = await self.get_job_instance(session, job_slug, status)
         return JobResponse.model_validate(job) if job else None
 
+    @cached(
+        key_prefix="category",
+        tags=["category_{category_id}"],
+        response_model=CategoryResponse,
+    )
     async def get_category(
         self,
         session: AsyncSession,
@@ -87,6 +105,11 @@ class BaseJobService:
             print(e)
             return None
 
+    @cached(
+        key_prefix="categories",
+        tags=["categories", "categories_list"],
+        response_model=CategoryResponse,
+    )
     async def get_all_categories(self, session: AsyncSession, query: str | None = None):
         try:
             if query:

@@ -1,17 +1,17 @@
 import asyncio
 import json
-import os
-from typing import Any, Callable, Optional
+from typing import Any, List, TypeVar
 
 import redis.asyncio as redis
+from pydantic import BaseModel
 from redis.exceptions import RedisError
+
+from app.config.settings import settings
+
+T = TypeVar("T")
 
 
 class AsyncRedisClient:
-    """
-    Async, event-loop-safe Singleton Redis Client
-    """
-
     _instance = None
     _lock = asyncio.Lock()
 
@@ -23,114 +23,60 @@ class AsyncRedisClient:
     async def init(self):
         if hasattr(self, "client"):
             return
-
         async with self._lock:
             if hasattr(self, "client"):
                 return
+            try:
+                self.client = redis.Redis(
+                    host=settings.REDIS_HOST,
+                    port=settings.REDIS_PORT,
+                    decode_responses=True,  # Critical for tag manipulation
+                    socket_timeout=5,
+                )
+            except Exception as e:
+                print(e)
 
-            self.client = redis.Redis(
-                host=os.getenv("REDIS_HOST", "localhost"),
-                port=int(os.getenv("REDIS_PORT", 6379)),
-                db=int(os.getenv("REDIS_DB", 0)),
-                password=os.getenv("REDIS_PASSWORD"),
-                decode_responses=True,
-                socket_connect_timeout=5,
-                socket_timeout=5,
-                retry_on_timeout=True,
-                health_check_interval=30,
-            )
+    def _get_tag_key(self, tag: str) -> str:
+        return f"tag:{tag}"
 
-            # Optional startup check
-            await self.client.ping()
-
-    # -------------------------
-    # Core Utilities
-    # -------------------------
-
-    async def ping(self) -> bool:
+    async def set_with_tags(self, key: str, value: Any, ttl: int = 600, tags: List[str] = []):
         try:
-            return await self.client.ping()
-        except RedisError:
-            return False
+            # Serialize: Handle Pydantic models, lists, or dicts
+            if isinstance(value, BaseModel):
+                data = value.model_dump_json()
+            elif isinstance(value, (list, dict)):
+                data = json.dumps(value, default=str)
+            else:
+                data = str(value)
 
-    async def close(self):
-        await self.client.close()
-
-    # -------------------------
-    # Basic KV
-    # -------------------------
-
-    async def get(self, key: str) -> Optional[str]:
-        try:
-            return await self.client.get(key)
-        except RedisError:
-            return None
-
-    async def set(
-        self,
-        key: str,
-        value: str,
-        ttl: Optional[int] = None,
-        nx: bool = False,
-    ) -> bool:
-        try:
-            return await self.client.set(
-                name=key,
-                value=value,
-                ex=ttl,
-                nx=nx,
-            )
-        except RedisError:
-            return False
-
-    async def delete(self, key: str):
-        try:
-            await self.client.delete(key)
+            async with self.client.pipeline(transaction=True) as pipe:
+                pipe.setex(key, ttl, data)
+                for tag in tags:
+                    t_key = self._get_tag_key(tag)
+                    pipe.sadd(t_key, key)
+                    pipe.expire(t_key, ttl)  # Tags live slightly longer than keys
+                await pipe.execute()
         except RedisError:
             pass
 
-    # -------------------------
-    # JSON Helpers
-    # -------------------------
-
-    async def get_json(self, key: str) -> Optional[Any]:
-        value = await self.get(key)
-        if value is None:
-            return None
+    async def invalidate_tags(self, tags: List[str]):
         try:
-            return json.loads(value)
-        except json.JSONDecodeError:
-            return None
+            all_keys = set()
+            tag_keys = [self._get_tag_key(t) for t in tags]
 
-    async def set_json(
-        self,
-        key: str,
-        value: Any,
-        ttl: Optional[int] = None,
-    ) -> bool:
-        try:
-            return await self.set(key, json.dumps(value), ttl)
-        except (TypeError, RedisError):
-            return False
+            # Fetch all keys associated with these tags
+            for t_key in tag_keys:
+                keys = await self.client.smembers(t_key)
+                if keys:
+                    all_keys.update(keys)
 
-    # -------------------------
-    # Cache Aside Pattern
-    # -------------------------
-
-    async def get_or_set(
-        self,
-        key: str,
-        getter: Callable[[], Any],
-        ttl: int = 60,
-    ) -> Any:
-        cached = await self.get_json(key)
-        if cached is not None:
-            return cached
-
-        data = await getter()
-        await self.set_json(key, data, ttl)
-        return data
+            if all_keys:
+                async with self.client.pipeline(transaction=True) as pipe:
+                    pipe.delete(*all_keys)
+                    pipe.delete(*tag_keys)
+                    await pipe.execute()
+        except RedisError:
+            pass
 
 
-# ✅ Global instance
 redis_client = AsyncRedisClient()

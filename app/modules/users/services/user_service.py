@@ -3,10 +3,12 @@ from typing import List, Optional
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
 from app.modules.users.models.user import Users
 
 
 class UserService:
+    @invalidate_cache(tags=["users_list"])
     async def create_user(self, user_data: dict, session: AsyncSession) -> Users:
         try:
             user = Users(**user_data)
@@ -18,6 +20,7 @@ class UserService:
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["users_list"])
     async def delete_user(self, user_id: int, session: AsyncSession) -> bool:
         try:
             user = await session.get(Users, user_id)
@@ -31,6 +34,7 @@ class UserService:
             raise e
         return True
 
+    @invalidate_cache(tags=["user_{user_id}", "users_list"])
     async def update_user(
         self, user_id: int, update_data: dict, session: AsyncSession
     ) -> Optional[Users]:
@@ -48,6 +52,7 @@ class UserService:
             await session.rollback()
             raise e
 
+    @cached(key_prefix="users", tags=["user_{user_id}"], response_model=Users)
     async def get_user(
         self,
         session: AsyncSession,
@@ -75,6 +80,7 @@ class UserService:
             await session.rollback()
             raise e
 
+    @cached(key_prefix="users", tags=["users_list"], response_model=list[Users])
     async def get_all_users(self, session: AsyncSession) -> List[Users]:
         try:
             result = await session.exec(select(Users))

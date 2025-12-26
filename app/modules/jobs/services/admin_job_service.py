@@ -5,6 +5,7 @@ from slugify import slugify
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
 from app.common.lib.formatter import TokenPayload
 from app.modules.jobs.models.jobs import Category, Job, JobStatus
 from app.modules.jobs.schemas.category_validations import CategoryCreate, CategoryUpdate
@@ -17,6 +18,7 @@ from app.modules.jobs.services.base_job_service import BaseJobService
 
 
 class AdminJobService(BaseJobService):
+    @invalidate_cache(tags=["categories", "categories_list"])
     async def create_category(self, session: AsyncSession, category_data: CategoryCreate):
         category = await self.get_category(session=session, category_name=category_data.name)
         if category:
@@ -32,6 +34,7 @@ class AdminJobService(BaseJobService):
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["categories", "categories_list", "category_{category_id}"])
     async def update_category(
         self, session: AsyncSession, category_id: int, category_data: CategoryUpdate
     ):
@@ -49,6 +52,7 @@ class AdminJobService(BaseJobService):
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["jobs_list"])
     async def create_job(
         self, session: AsyncSession, job_data: ThirdPartyJobCreate, current_admin: TokenPayload
     ):
@@ -77,6 +81,7 @@ class AdminJobService(BaseJobService):
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["jobs_list", "job_{job_slug}"])
     async def update_job(
         self,
         session: AsyncSession,
@@ -111,6 +116,7 @@ class AdminJobService(BaseJobService):
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["jobs_list", "job_{job_slug}"])
     async def update_job_status(
         self,
         session: AsyncSession,
@@ -137,6 +143,7 @@ class AdminJobService(BaseJobService):
             await session.rollback()
             raise e
 
+    @cached(key_prefix="jobs", tags=["jobs_count"], response_model=int)
     async def get_all_jobs_count(self, session: AsyncSession, params: Optional[dict] = None):
         query = select(func.count()).select_from(Job)
 

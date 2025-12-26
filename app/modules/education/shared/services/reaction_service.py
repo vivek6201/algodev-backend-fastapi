@@ -3,6 +3,7 @@ from typing import Optional
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
 from app.modules.education.shared.model import (
     ReactionType,
     UserReaction,
@@ -12,6 +13,7 @@ from app.modules.education.shared.model import (
 class ReactionService:
     """Reusable service for handling user reactions on any content"""
 
+    @cached(key_prefix="reactions", tags=["reaction_{content_slug}"], response_model=UserReaction)
     async def get_user_reaction(
         self,
         session: AsyncSession,
@@ -26,6 +28,7 @@ class ReactionService:
         result = await session.exec(statement)
         return result.first()
 
+    @invalidate_cache(tags=["reaction_{content_slug}", "reaction_counts_{content_slug}"])
     async def toggle_reaction(
         self,
         session: AsyncSession,
@@ -69,6 +72,7 @@ class ReactionService:
         await session.commit()
         return result
 
+    @cached(key_prefix="reactions", tags=["reaction_counts_{content_slug}"], response_model=dict)
     async def get_reaction_counts(
         self,
         session: AsyncSession,

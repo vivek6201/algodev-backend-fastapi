@@ -1,6 +1,7 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
 from app.modules.education.shared.model import (
     CategoriesBase,
     EducationCategory,
@@ -8,12 +9,18 @@ from app.modules.education.shared.model import (
 
 
 class EducationService:
+    @cached(
+        key_prefix="edu",
+        tags=["edu_category_{category_id}"],
+        response_model=EducationCategory,
+    )
     async def get_category(self, session: AsyncSession, category_id: int):
         try:
             return await session.get(EducationCategory, category_id)
         except Exception as e:
             raise e
 
+    @cached(key_prefix="edu", tags=["edu_categories"], response_model=EducationCategory)
     async def get_categories(self, session: AsyncSession):
         try:
             result = await session.exec(select(EducationCategory))
@@ -21,6 +28,7 @@ class EducationService:
         except Exception as e:
             raise e
 
+    @invalidate_cache(tags=["edu_categories"])
     async def create_category(self, session: AsyncSession, category_data: CategoriesBase):
         try:
             category = EducationCategory(**category_data.dict())
@@ -31,6 +39,7 @@ class EducationService:
         except Exception as e:
             raise e
 
+    @invalidate_cache(tags=["edu_categories", "edu_category_{category_id}"])
     async def update_category(
         self, session: AsyncSession, category_id: int, category_data: CategoriesBase
     ):
@@ -48,5 +57,6 @@ class EducationService:
         except Exception as e:
             raise e
 
+    @invalidate_cache(tags=["edu_categories", "edu_category_{category_id}"])
     async def delete_category(self, session: AsyncSession, category_id: int):
         pass

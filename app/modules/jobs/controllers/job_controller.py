@@ -36,11 +36,11 @@ class JobController:
             return SuccessResponse(
                 message="Jobs fetched successfully",
                 data={
-                    "data": result["jobs"],
+                    "data": result.data,
                     "page": page,
                     "limit": limit,
-                    "total_items": result["total_items"],
-                    "total_pages": result["total_pages"],
+                    "total_items": result.total_items,
+                    "total_pages": result.total_pages,
                 },
             )
         except Exception as e:

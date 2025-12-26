@@ -3,11 +3,13 @@ from typing import Optional
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import cached, invalidate_cache
 from app.modules.users.models.admin import Admin
 from app.modules.users.schemas.admin_validations import AdminCreate
 
 
 class AdminService:
+    @cached(key_prefix="admin", tags=["admin_{admin_id}"], response_model=Admin)
     async def get_admin(
         self,
         session: AsyncSession,
@@ -37,6 +39,7 @@ class AdminService:
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["admin_list"])
     async def create_admin(self, admin_data: AdminCreate, session: AsyncSession):
         try:
             admin = Admin(**admin_data.model_dump())
@@ -48,6 +51,7 @@ class AdminService:
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["admin_{admin_id}"])
     async def update_admin(self, admin_id: int, update_data: dict, session: AsyncSession):
         try:
             admin = await session.get(Admin, admin_id)

@@ -1,4 +1,3 @@
-import math
 from typing import Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -27,14 +26,14 @@ class AdminBlogController:
             if not admin:
                 return ErrorResponse(message="Admin not found", status_code=HTTP_404_NOT_FOUND)
 
-            blogs, total_items = await self.admin_blog_service.get_blogs(session=session, **params)
+            result = await self.admin_blog_service.get_blogs(session=session, **params)
 
             data = {
-                "data": blogs,
+                "data": result.data,
                 "page": params.get("page", 1),
                 "limit": params.get("limit", 10),
-                "total_items": total_items,
-                "total_pages": math.ceil(total_items / params.get("limit", 10)),
+                "total_items": result.total_items,
+                "total_pages": result.total_pages,
             }
 
             return SuccessResponse(message="Blogs fetched successfully", data=data)

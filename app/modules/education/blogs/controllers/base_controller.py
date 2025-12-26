@@ -15,13 +15,14 @@ class BaseBlogController:
 
     async def get_blogs(self, session: AsyncSession, params: Optional[dict] = None):
         try:
-            blogs, total_items = await self.base_service.get_blogs(session=session, **params)
+            result = await self.base_service.get_blogs(session=session, **params)
 
             data = {
-                "data": blogs,
+                "data": result.data,
                 "page": params.get("page", 1),
                 "limit": params.get("limit", 10),
-                "total_items": total_items,
+                "total_items": result.total_items,
+                "total_pages": result.total_pages,
             }
 
             return SuccessResponse(message="Blogs fetched successfully", data=data)
@@ -48,14 +49,14 @@ class BaseBlogController:
         self, session: AsyncSession, blog_slug: str, user_id: Optional[int] = None
     ):
         try:
-            blog = await self.base_service.get_blog_metadata(
+            metadata = await self.base_service.get_blog_metadata(
                 session=session, blog_slug=blog_slug, user_id=user_id
             )
 
-            if not blog:
-                return ErrorResponse(message="Blog not found", status_code=HTTP_404_NOT_FOUND)
+            if not metadata:
+                return ErrorResponse(message="No metadata found", status_code=HTTP_404_NOT_FOUND)
 
-            return SuccessResponse(message="Blog metadata fetched successfully", data=blog)
+            return SuccessResponse(message="Blog metadata fetched successfully", data=metadata)
         except Exception as e:
             print(e)
             return ErrorResponse(message="Something went wrong", error=str(e))

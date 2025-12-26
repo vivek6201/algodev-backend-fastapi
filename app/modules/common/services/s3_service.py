@@ -87,6 +87,7 @@ class S3Service:
                 extension=file_extension,
                 size=head_response.get("ContentLength"),
                 last_modified=head_response.get("LastModified"),
+                id=object_name,
             )
         except ClientError as e:
             # If the file doesn't exist or other S3 error

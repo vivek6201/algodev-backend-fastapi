@@ -68,7 +68,7 @@ class AuthService:
     def create_access_token(self, data: TokenPayload, expires_delta: Optional[timedelta] = None):
         to_encode = data.__dict__.copy()
         expire = datetime.now() + (
-            expires_delta or timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            expires_delta or timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_SECONDS)
         )
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(
@@ -80,7 +80,7 @@ class AuthService:
     def create_refresh_token(self, data: TokenPayload, expires_delta: Optional[timedelta] = None):
         to_encode = data.__dict__.copy()
         expire = datetime.now() + (
-            expires_delta or timedelta(minutes=self.settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+            expires_delta or timedelta(minutes=self.settings.REFRESH_TOKEN_EXPIRE_SECONDS)
         )
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(

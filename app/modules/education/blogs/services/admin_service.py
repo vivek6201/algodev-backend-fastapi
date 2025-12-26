@@ -4,6 +4,7 @@ from slugify import slugify
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.common.cache.decorators import invalidate_cache
 from app.modules.education.blogs.schema.blogs import CreateBlog, UpdateBlog
 from app.modules.education.shared.model import EducationCategory
 
@@ -12,6 +13,7 @@ from .base_service import BaseBlogService
 
 
 class AdminBlogService(BaseBlogService):
+    @invalidate_cache(tags=["blogs_list"])
     async def create_blog(self, session: AsyncSession, blog_data: CreateBlog):
         if not blog_data.slug:
             base_slug = slugify(blog_data.title)
@@ -42,6 +44,7 @@ class AdminBlogService(BaseBlogService):
             await session.rollback()
             raise e
 
+    @invalidate_cache(tags=["blogs_list", "blog_{blog_slug}"])
     async def update_blog(self, session: AsyncSession, blog_slug: str, blog_data: UpdateBlog):
         blog = await self.get_blog_instance(
             session=session, blog_slug=blog_slug, load_categories=True

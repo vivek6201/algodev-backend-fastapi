@@ -17,8 +17,8 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = ""
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
+    ACCESS_TOKEN_EXPIRE_SECONDS: int = 60 * 60 * 24
+    REFRESH_TOKEN_EXPIRE_SECONDS: int = 60 * 60 * 24 * 7
     ALGORITHM: str = "HS256"
 
     # Database
@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     AWS_CLOUDFRONT_DOMAIN: Optional[str] = None
 
     # Redis
-    REDIS_HOST: Optional[str] = None
-    REDIS_PORT: Optional[int] = None
+    REDIS_HOST: Optional[str] = "localhost"
+    REDIS_PORT: Optional[int] = 6379
 
     # CORS - parsed from comma-separated string in .env
     CORS_ORIGINS: list[str] = [
