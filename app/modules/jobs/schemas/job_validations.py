@@ -24,6 +24,8 @@ class JobUpdateBase(BaseModel):
     job_mode: Optional[JobMode] = None
     category_id: Optional[List[int]] = None
     status: Optional[JobStatus] = None
+    min_experience: Optional[int] = None
+    max_experience: Optional[int] = None
 
 
 class JobStatusUpdate(BaseModel):
@@ -73,6 +75,8 @@ class JobResponse(BaseModel):
     job_mode: JobMode
     min_salary: Optional[int] = None
     max_salary: Optional[int] = None
+    min_experience: int
+    max_experience: int
     listing_type: ListingType
     external_apply_url: Optional[str] = None
     admin_id: Optional[int] = None
@@ -99,6 +103,8 @@ class CompactJobResponse(BaseModel):
     job_mode: JobMode
     min_salary: int
     max_salary: int
+    min_experience: int
+    max_experience: int
     listing_type: ListingType
     company_name: str
     status: JobStatus
