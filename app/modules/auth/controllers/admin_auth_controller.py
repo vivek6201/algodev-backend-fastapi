@@ -24,6 +24,7 @@ class AdminAuthController:
             result = await session.exec(select(Admin).where(Admin.email == body.email))
             admin = result.one_or_none()
         except Exception as e:
+            print(e)
             return ErrorResponse(message=str(e), status_code=500)
 
         if not admin:
@@ -59,7 +60,7 @@ class AdminAuthController:
 
         # Set tokens in HTTP-only cookies
         response.set_cookie(
-            key="access_token",
+            key="admin_access_token",
             value=access_token,
             httponly=True,
             max_age=60,
@@ -69,7 +70,7 @@ class AdminAuthController:
             domain=settings.DOMAIN,
         )
         response.set_cookie(
-            key="refresh_token",
+            key="admin_refresh_token",
             value=refresh_token,
             httponly=True,
             max_age=3600,
@@ -96,16 +97,16 @@ class AdminAuthController:
         )
 
         # Clear cookies
-        response.delete_cookie(key="access_token")
-        response.delete_cookie(key="refresh_token")
+        response.delete_cookie(key="admin_access_token")
+        response.delete_cookie(key="admin_refresh_token")
 
         return response
 
     async def refresh_admin_token(self, session: AsyncSession, request: Request):
-        refresh_token = request.cookies.get("refresh_token")
+        refresh_token = request.cookies.get("admin_refresh_token")
 
         if not refresh_token:
-            refresh_token = request.headers.get("refresh_token")
+            refresh_token = request.headers.get("admin_refresh_token")
 
         if not refresh_token:
             return ErrorResponse(message="Refresh token not found", status_code=401)
@@ -148,7 +149,7 @@ class AdminAuthController:
 
         # Set tokens in HTTP-only cookies
         response.set_cookie(
-            key="access_token",
+            key="admin_access_token",
             value=access_token,
             httponly=True,
             max_age=60,
@@ -159,7 +160,7 @@ class AdminAuthController:
         )
 
         response.set_cookie(
-            key="refresh_token",
+            key="admin_refresh_token",
             value=refresh_token,
             httponly=True,
             max_age=3600,

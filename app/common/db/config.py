@@ -10,6 +10,11 @@ from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+connect_args = {}
+
+if settings.IS_PRODUCTION:
+    connect_args["ssl"] = ssl.create_default_context()
+
 # Create database engine
 engine = create_async_engine(
     settings.ASYNC_DATABASE_URL,
@@ -17,7 +22,7 @@ engine = create_async_engine(
     pool_pre_ping=True,  # Verify connections before using them
     pool_size=5,  # Number of connections to maintain
     max_overflow=10,  # Maximum number of connections beyond pool_size
-    connect_args={"ssl": ssl.create_default_context()},
+    connect_args=connect_args,
 )
 
 # Create session factory

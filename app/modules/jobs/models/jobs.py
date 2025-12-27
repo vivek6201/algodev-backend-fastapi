@@ -75,6 +75,8 @@ class JobBase(SQLModel):
     min_salary: Optional[int] = None
     max_salary: Optional[int] = None
     listing_type: ListingType = pg_enum(ListingType, nullable=False)
+    min_experience: Optional[int] = 0
+    max_experience: Optional[int] = 0
 
 
 class Job(JobBase, table=True):

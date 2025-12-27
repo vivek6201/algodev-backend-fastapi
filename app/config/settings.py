@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     DEBUG: bool = False
     DOMAIN: Optional[str] = "localhost"
+    ENV: str = "development"
+
+    @property
+    def IS_PRODUCTION(self) -> bool:
+        return self.ENV == "production"
 
     # Server Settings
     HOST: str = "0.0.0.0"
