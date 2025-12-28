@@ -1,48 +1,45 @@
 from logging.config import fileConfig
 from alembic import context
 import asyncio
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from alembic.autogenerate import renderers
-from sqlalchemy.dialects.postgresql import ENUM
 
-# NOW import app modules
+import sqlmodel
+from sqlalchemy.dialects.postgresql import ENUM
+from alembic.autogenerate import renderers
+
 from app.config.settings import settings
 from app.common.db.config import engine
-import sqlmodel
-from app.modules.users.models.user import *
-from app.modules.users.models.admin import *
-from app.modules.jobs.models.jobs import *
-from app.modules.education.blogs.models.blog import *
-from app.modules.education.shared.model import *
+from app.common.db.models import *  # noqa
 
-# this is the Alembic Config object
 config = context.config
 
-# Interpret the config file for Python logging
-if config.config_file_name is not None:
+if config.config_file_name:
     fileConfig(config.config_file_name)
 
-# Set your database URL from settings
-config.set_main_option("sqlalchemy.url", settings.ASYNC_DATABASE_URL)
 
-# Add your model's MetaData object here for 'autogenerate' support
+def get_sync_url():
+    return settings.ASYNC_DATABASE_URL.replace("+asyncpg", "")
+
+
+config.set_main_option("sqlalchemy.url", get_sync_url())
+
 target_metadata = sqlmodel.SQLModel.metadata
+
 
 @renderers.dispatch_for(ENUM)
 def render_enum(type_, autogen_context):
-    return "sa.Enum(%s, name='%s', create_type=True, checkfirst=True)" % (
-        ", ".join("'%s'" % e for e in type_.enums),
-        type_.name
+    autogen_context.imports.add("import sqlalchemy as sa")
+    return (
+        "sa.Enum(%s, name='%s', create_type=True)"
+        % (
+            ", ".join(repr(e) for e in type_.enums),
+            type_.name,
+        )
     )
 
 
-def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
+def run_migrations_offline():
     context.configure(
-        url=url,
+        url=get_sync_url(),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -64,21 +61,13 @@ def do_run_migrations(connection):
         context.run_migrations()
 
 
-async def run_async_migrations() -> None:
-    """In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    connectable = engine
-
-    async with connectable.connect() as connection:
+async def run_async_migrations():
+    async with engine.connect() as connection:
         await connection.run_sync(do_run_migrations)
+    await engine.dispose()
 
-    await connectable.dispose()
 
-
-def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+def run_migrations_online():
     asyncio.run(run_async_migrations())
 
 
