@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
+from sqlalchemy import Index
 from sqlmodel import Field, Relationship, SQLModel
 
 from app.modules.common.model import SoftDeleteMixin
@@ -21,7 +22,7 @@ class Tutorial(SoftDeleteMixin, SQLModel, table=True):
         link_model=TutorialCategoryLink,
     )
 
-    is_published: bool = False
+    is_published: bool = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -30,14 +31,33 @@ class Tutorial(SoftDeleteMixin, SQLModel, table=True):
 
 
 class Node(SoftDeleteMixin, SQLModel, table=True):
+    __table_args__ = (
+        # 1️⃣ Unique slug per tutorial for ROOT nodes (chapters)
+        Index(
+            "uq_node_tutorial_slug_root",
+            "tutorial_id",
+            "slug",
+            unique=True,
+            postgresql_where="parent_id IS NULL AND is_deleted = false",
+        ),
+        # 2️⃣ Unique slug per parent for CHILD nodes (topics)
+        Index(
+            "uq_node_parent_slug",
+            "parent_id",
+            "slug",
+            unique=True,
+            postgresql_where="parent_id IS NOT NULL AND is_deleted = false",
+        ),
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
 
     title: str
-    slug: str
+    slug: str = Field(index=True)
     order: int = Field(default=0, nullable=False)
 
     tutorial_id: int = Field(foreign_key="tutorial.id", index=True)
-    tutorial: Tutorial = Relationship(back_populates="nodes")
+    tutorial: "Tutorial" = Relationship(back_populates="nodes")
 
     node_type_id: int = Field(foreign_key="nodetype.id", index=True)
     node_type: "NodeType" = Relationship(back_populates="nodes")
@@ -51,7 +71,7 @@ class Node(SoftDeleteMixin, SQLModel, table=True):
 
     node_metadata: Optional["NodeMetadata"] = Relationship(back_populates="node")
 
-    is_published: bool = False
+    is_published: bool = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -66,7 +86,7 @@ class NodeType(SoftDeleteMixin, SQLModel, table=True):
     description: Optional[str] = None
     icon: Optional[str] = None
 
-    is_leaf: bool = False
+    is_leaf: bool = Field(default=False, nullable=False, index=True)
 
     nodes: List["Node"] = Relationship(back_populates="node_type")
 

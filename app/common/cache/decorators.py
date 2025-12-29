@@ -5,6 +5,7 @@ from typing import List, Type, TypeVar
 from pydantic.type_adapter import TypeAdapter
 
 from app.common.cache.redis import redis_client
+from app.common.db.config import logger
 
 T = TypeVar("T")
 
@@ -27,7 +28,7 @@ def cached(key_prefix: str, response_model: Type[T], ttl: int = 3600, tags: List
                 try:
                     return TypeAdapter(response_model).validate_json(raw)
                 except Exception:
-                    pass  # Schema changed? Ignore and re-fetch
+                    logger.exception("Cache schema mismatch")
 
             # 2. Database Call
             result = await func(*args, **kwargs)

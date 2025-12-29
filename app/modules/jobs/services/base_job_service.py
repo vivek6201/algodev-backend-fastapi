@@ -48,7 +48,7 @@ class BaseJobService:
         if page:
             query = query.offset((page - 1) * limit).limit(limit)
 
-        result = await session.exec(query)
+        result = await session.exec(query.order_by(Job.created_at.desc()))
         return ListResponse[CompactJobResponse](
             data=result.all(),
             total_items=total_items,
