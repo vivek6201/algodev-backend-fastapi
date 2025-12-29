@@ -24,6 +24,4 @@ async def get_all_tutorials(request: Request, session: AsyncSession = Depends(ge
 
 @base_router.get("/one/{tutorial_slug}")
 async def get_tutorial(tutorial_slug: str, session: AsyncSession = Depends(get_session)):
-    return await base_controller.get_tutorial(
-        session=session, tutorial_slug=tutorial_slug, is_published=True
-    )
+    return await base_controller.get_tutorial(session=session, tutorial_slug=tutorial_slug)

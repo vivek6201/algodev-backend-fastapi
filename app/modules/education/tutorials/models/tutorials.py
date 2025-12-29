@@ -22,7 +22,7 @@ class Tutorial(SoftDeleteMixin, SQLModel, table=True):
         link_model=TutorialCategoryLink,
     )
 
-    is_published: bool = Field(default=False, nullable=False, index=True)
+    is_published: Optional[bool] = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(
         default_factory=datetime.utcnow,
@@ -35,10 +35,10 @@ class Node(SoftDeleteMixin, SQLModel, table=True):
         # 1️⃣ Unique slug per tutorial for ROOT nodes (chapters)
         Index(
             "uq_node_tutorial_slug_root",
-            "tutorial_id",
+            "tutorial_slug",
             "slug",
             unique=True,
-            postgresql_where="parent_id IS NULL AND is_deleted = false",
+            postgresql_where="parent_id IS NULL AND deleted_at IS NULL",
         ),
         # 2️⃣ Unique slug per parent for CHILD nodes (topics)
         Index(
@@ -46,7 +46,7 @@ class Node(SoftDeleteMixin, SQLModel, table=True):
             "parent_id",
             "slug",
             unique=True,
-            postgresql_where="parent_id IS NOT NULL AND is_deleted = false",
+            postgresql_where="parent_id IS NOT NULL AND deleted_at IS NULL",
         ),
     )
 
@@ -56,7 +56,7 @@ class Node(SoftDeleteMixin, SQLModel, table=True):
     slug: str = Field(index=True)
     order: int = Field(default=0, nullable=False)
 
-    tutorial_id: int = Field(foreign_key="tutorial.id", index=True)
+    tutorial_slug: str = Field(foreign_key="tutorial.slug", index=True)
     tutorial: "Tutorial" = Relationship(back_populates="nodes")
 
     node_type_id: int = Field(foreign_key="nodetype.id", index=True)
@@ -86,7 +86,7 @@ class NodeType(SoftDeleteMixin, SQLModel, table=True):
     description: Optional[str] = None
     icon: Optional[str] = None
 
-    is_leaf: bool = Field(default=False, nullable=False, index=True)
+    is_leaf: Optional[bool] = Field(default=False, nullable=False, index=True)
 
     nodes: List["Node"] = Relationship(back_populates="node_type")
 

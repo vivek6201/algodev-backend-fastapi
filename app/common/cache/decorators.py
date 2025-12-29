@@ -35,8 +35,17 @@ def cached(key_prefix: str, response_model: Type[T], ttl: int = 3600, tags: List
 
             # 3. Save to Cache
             if result:
+                # Validate and convert to Pydantic model to ensure relationships are loaded
+                adapter = TypeAdapter(response_model)
+                validated_result = adapter.validate_python(result)
+
                 dynamic_tags = [t.format(**sig.arguments) for t in (tags or [])]
-                await redis_client.set_with_tags(cache_key, result, ttl, dynamic_tags)
+                # Cache the JSON representation
+                await redis_client.set_with_tags(
+                    cache_key, validated_result.model_dump_json(), ttl, dynamic_tags
+                )
+                return validated_result
+
             return result
 
         return wrapper

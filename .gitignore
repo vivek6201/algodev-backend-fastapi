@@ -9,4 +9,3 @@ wheels/
 
 # Virtual environments
 .venv
-cloudfront_private_key.pem

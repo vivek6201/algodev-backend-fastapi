@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # Security
-    SECRET_KEY: str = ""
+    SECRET_KEY: str = "secret"
     ACCESS_TOKEN_EXPIRE_SECONDS: int = 60 * 60 * 24
     REFRESH_TOKEN_EXPIRE_SECONDS: int = 60 * 60 * 24 * 7
     ALGORITHM: str = "HS256"
