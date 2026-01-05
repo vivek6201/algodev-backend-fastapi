@@ -41,9 +41,8 @@ def cached(key_prefix: str, response_model: Type[T], ttl: int = 3600, tags: List
 
                 dynamic_tags = [t.format(**sig.arguments) for t in (tags or [])]
                 # Cache the JSON representation
-                await redis_client.set_with_tags(
-                    cache_key, validated_result.model_dump_json(), ttl, dynamic_tags
-                )
+                json_data = adapter.dump_json(validated_result).decode("utf-8")
+                await redis_client.set_with_tags(cache_key, json_data, ttl, dynamic_tags)
                 return validated_result
 
             return result

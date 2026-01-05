@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy.orm.strategy_options import selectinload
 from sqlmodel import func, select
@@ -108,7 +108,7 @@ class BaseJobService:
     @cached(
         key_prefix="categories",
         tags=["categories", "categories_list"],
-        response_model=CategoryResponse,
+        response_model=List[CategoryResponse],
     )
     async def get_all_categories(self, session: AsyncSession, query: str | None = None):
         try:

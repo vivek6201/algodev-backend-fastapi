@@ -28,6 +28,7 @@ class CreateNodeType(BaseModel):
 
 
 class NodeTypeResponse(BaseModel):
+    id: int
     name: str
     is_leaf: Optional[bool] = False
     model_config = ConfigDict(from_attributes=True)

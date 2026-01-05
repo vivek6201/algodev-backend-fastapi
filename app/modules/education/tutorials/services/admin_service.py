@@ -2,12 +2,17 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.cache.decorators import invalidate_cache
+from app.common.cache.redis import redis_client
 from app.common.db.config import logger
 from app.common.lib.slug_utils import create_slug
 from app.modules.education.shared.model import EducationCategory
 
 from ..models.tutorials import Node, NodeType, Tutorial
-from ..schemas.tutorials import CreateNodeType, NodeBase, TutorialBase
+from ..schemas.tutorials import (
+    CreateNodeType,
+    NodeBase,
+    TutorialBase,
+)
 from .base_service import BaseService
 
 
@@ -85,6 +90,10 @@ class AdminService(BaseService):
                 "status": False,
             }
 
+    @invalidate_cache(tags=["nodes_list"])
+    async def update_node(self, session: AsyncSession, node_id: int, node_data: NodeBase):
+        pass
+
     @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}"])
     async def create_node(self, session: AsyncSession, tutorial_slug: str, node_data: NodeBase):
         data_dict = node_data.model_dump(exclude={"node_type"})
@@ -94,6 +103,14 @@ class AdminService(BaseService):
         statement = select(Node).where(Node.slug == data_dict["slug"], Node.deleted_at.is_(None))
 
         if data_dict["parent_id"]:
+            # Verify parent exists
+            parent_node = await session.get(Node, data_dict["parent_id"])
+            if not parent_node or parent_node.deleted_at:
+                return {
+                    "message": "Parent node not found",
+                    "status": False,
+                }
+
             # If child node, check uniqueness under same parent
             statement = statement.where(Node.parent_id == data_dict["parent_id"])
         else:
@@ -128,6 +145,11 @@ class AdminService(BaseService):
             session.add(node)
             await session.commit()
             await session.refresh(node)
+
+            # Invalidate parent node cache if it exists
+            if node.parent_id and parent_node:
+                await redis_client.invalidate_tags([f"node_{tutorial_slug}_{parent_node.slug}"])
+
             return {
                 "message": "Node created successfully",
                 "status": True,
@@ -141,6 +163,85 @@ class AdminService(BaseService):
                 "status": False,
             }
 
-    @invalidate_cache(tags=["nodes_list"])
-    async def update_node(self, session: AsyncSession, node_id: int, node_data: NodeBase):
-        pass
+    @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}"])
+    async def delete_node_soft(self, session: AsyncSession, tutorial_slug: str, node_id: int):
+        node = await session.get(Node, node_id)
+        if not node or node.deleted_at:
+            return {
+                "message": "Node not found",
+                "status": False,
+            }
+
+        statement = select(Node).where(Node.parent_id == node_id, Node.deleted_at.is_(None))
+        result = await session.exec(statement)
+        children = result.all()
+
+        if not node.node_type.is_leaf and children:
+            return {
+                "message": "Cannot delete a category that has children. Please delete children first.",
+                "status": False,
+            }
+
+        try:
+            node.soft_delete()
+            session.add(node)
+            await session.commit()
+
+            # Invalidate parent node cache
+            if node.parent_id:
+                parent_node = await session.get(Node, node.parent_id)
+                if parent_node:
+                    await redis_client.invalidate_tags([f"node_{tutorial_slug}_{parent_node.slug}"])
+
+            return {
+                "message": "Node deleted successfully",
+                "status": True,
+            }
+        except Exception as e:
+            await session.rollback()
+            logger.exception(e)
+            return {
+                "message": "Something went wrong",
+                "status": False,
+            }
+
+    @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}", "job_{job_slug}"])
+    async def delete_node_hard(self, session: AsyncSession, tutorial_slug: str, node_id: int):
+        node = await session.get(Node, node_id)
+        # For hard delete we might want to allow deleting already soft-deleted nodes too
+        if not node:
+            return {
+                "message": "Node not found",
+                "status": False,
+            }
+
+        # Check children (even soft deleted ones should be checked for consistent DB state
+        # or we just rely on FK constraints? Better to check explicitly)
+        statement = select(Node).where(Node.parent_id == node_id)
+        result = await session.exec(statement)
+        children = result.all()
+
+        if not node.node_type.is_leaf and children:
+            return {
+                "message": "Cannot delete a category that has children. Please delete children first.",
+                "status": False,
+            }
+
+        try:
+            await session.delete(node)
+            await session.commit()
+
+            # Invalidate parent node cache
+            if node.parent_id:
+                parent_node = await session.get(Node, node.parent_id)
+                if parent_node:
+                    await redis_client.invalidate_tags([f"node_{tutorial_slug}_{parent_node.slug}"])
+
+            return {"message": "Node permanently deleted", "status": True}
+        except Exception as e:
+            await session.rollback()
+            logger.exception(e)
+            return {
+                "message": e.__str__(),
+                "status": False,
+            }

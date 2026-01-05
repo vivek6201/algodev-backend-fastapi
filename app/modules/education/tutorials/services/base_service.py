@@ -9,10 +9,11 @@ from app.common.cache.decorators import cached
 from app.common.lib.formatter import ListResponse
 from app.modules.education.tutorials.schemas.tutorials import (
     NodeResponse,
+    NodeTypeResponse,
     TutorialResponse,
 )
 
-from ..models.tutorials import Node, Tutorial
+from ..models.tutorials import Node, NodeType, Tutorial
 
 
 class BaseService:
@@ -30,6 +31,8 @@ class BaseService:
         is_published: Optional[bool] = None,
     ) -> ListResponse[Tutorial]:
         search = search.strip()
+        page = int(page)
+        limit = int(limit)
 
         # Build filters
         filters = [Tutorial.deleted_at.is_(None)]
@@ -54,9 +57,16 @@ class BaseService:
 
         return ListResponse[Tutorial](data=data, total_items=total_items, total_pages=total_pages)
 
-    def _build_node_tree(self, nodes: List[Node]) -> List[NodeResponse]:
+    def _to_node_dto(self, node: Node) -> NodeResponse:
+        """Helper to convert Node ORM to NodeResponse DTO."""
+        node_data = node.model_dump()
+        node_data["node_type"] = node.node_type
+        return NodeResponse(**node_data)
+
+    def _build_node_tree_and_map(self, nodes: List[Node]):
         """
         Manually build the tree from flat list of nodes.
+        Returns both the list of root nodes and the map of all nodes.
         Filters out non-root nodes from the top level list.
         """
         node_map = {}
@@ -70,11 +80,7 @@ class BaseService:
         # We rely on NodeResponse for the structure
         nodes_dto = []
         for node_orm in sorted_nodes:
-            # model_dump on SQLModel excludes relationships by default, which is what we want
-            node_data = node_orm.model_dump()
-            # Explicitly add node_type since it's required by NodeResponse
-            node_data["node_type"] = node_orm.node_type
-            dto = NodeResponse(**node_data)
+            dto = self._to_node_dto(node_orm)
             nodes_dto.append(dto)
             node_map[dto.id] = dto
 
@@ -85,10 +91,24 @@ class BaseService:
             else:
                 roots.append(dto)
 
+        return roots, node_map
+
+    def _build_node_tree(self, nodes: List[Node]) -> List[NodeResponse]:
+        roots, _ = self._build_node_tree_and_map(nodes)
         return roots
 
+    @cached(key_prefix="node_types", tags=["node_types"], response_model=List[NodeTypeResponse])
+    async def get_all_node_types(self, session: AsyncSession):
+        statement = select(NodeType).where(NodeType.deleted_at.is_(None))
+        result = await session.exec(statement)
+        node_types = result.all()
+
+        return [NodeTypeResponse.model_validate(node_type) for node_type in node_types]
+
     @cached(
-        key_prefix="tutorials", tags=["tutorial_{tutorial_slug}"], response_model=TutorialResponse
+        key_prefix="tutorials",
+        tags=["tutorial_{tutorial_slug}"],
+        response_model=TutorialResponse,
     )
     async def get_tutorial(
         self, session: AsyncSession, tutorial_slug: str, is_published: Optional[bool] = None
@@ -127,3 +147,58 @@ class BaseService:
 
             return response
         return None
+
+    @cached(
+        key_prefix="node_{tutorial_slug}_{node_slug}",
+        tags=["node_{tutorial_slug}_{node_slug}"],
+        response_model=NodeResponse,
+    )
+    async def get_node(
+        self,
+        session: AsyncSession,
+        tutorial_slug: str,
+        node_slug: str,
+        is_published: Optional[bool] = None,
+    ):
+        # Fetch the target node and its direct children
+        statement = select(Node).where(Node.slug == node_slug, Node.deleted_at.is_(None))
+        statement = statement.where(Node.tutorial_slug == tutorial_slug)
+        statement = statement.options(selectinload(Node.node_type))
+
+        if is_published is not None:
+            statement = statement.where(Node.is_published == is_published)
+
+        result = await session.exec(statement)
+        node = result.first()
+
+        if not node:
+            return None
+
+        # Fetch direct children
+        children_stmt = (
+            select(Node)
+            .where(Node.parent_id == node.id, Node.deleted_at.is_(None))
+            .options(selectinload(Node.node_type))
+            .order_by(Node.order)
+        )
+
+        if is_published is not None:
+            children_stmt = children_stmt.where(Node.is_published == is_published)
+
+        children_res = await session.exec(children_stmt)
+        children = children_res.all()
+
+        # 1. Target Node DTO
+        target_dto = self._to_node_dto(node)
+
+        # 2. Children DTOs (with empty children)
+        children_dtos = []
+        for child in children:
+            child_dto = self._to_node_dto(child)
+            # Explicitly set children to empty list to stop recursion/lazy loading
+            child_dto.children = []
+            children_dtos.append(child_dto)
+
+        target_dto.children = children_dtos
+
+        return target_dto

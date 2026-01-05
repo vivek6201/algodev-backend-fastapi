@@ -4,6 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.common.db.config import get_session
 from app.common.lib.formatter import TokenPayload
 from app.modules.auth.dependencies import ALL_ADMIN_ROLES, RoleChecker
+from app.modules.users.models.admin import AdminRole
 
 from ..controller.admin_controller import AdminController
 from ..schemas.tutorials import CreateNodeType, NodeBase, TutorialBase
@@ -29,6 +30,15 @@ async def get_all_tutorials(
     return await admin_controller.get_tutorials(session=session, params=params)
 
 
+@admin_router.get("/one/{tutorial_slug}")
+async def get_tutorial(
+    tutorial_slug: str,
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
+):
+    return await admin_controller.get_tutorial(session=session, tutorial_slug=tutorial_slug)
+
+
 @admin_router.post("/")
 async def create_tutorial(
     data: TutorialBase,
@@ -38,7 +48,7 @@ async def create_tutorial(
     return await admin_controller.create_tutorial(session=session, tutorial_data=data)
 
 
-@admin_router.patch("/{tutorial_slug}")
+@admin_router.patch("/one/{tutorial_slug}")
 async def update_tutorial(
     tutorial_slug: str,
     data: TutorialBase,
@@ -51,6 +61,14 @@ async def update_tutorial(
 
 
 # Nodes
+@admin_router.get("/node_type")
+async def get_all_node_types(
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
+):
+    return await admin_controller.get_all_node_types(session=session)
+
+
 @admin_router.post("/node_type")
 async def create_node_type(
     data: CreateNodeType,
@@ -69,4 +87,43 @@ async def create_node(
 ):
     return await admin_controller.create_node(
         session=session, tutorial_slug=tutorial_slug, node_data=data
+    )
+
+
+@admin_router.get("/{tutorial_slug}/node/{node_slug}")
+async def get_node(
+    tutorial_slug: str,
+    node_slug: str,
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
+):
+    return await admin_controller.get_node(
+        session=session, tutorial_slug=tutorial_slug, node_slug=node_slug
+    )
+
+
+@admin_router.delete("/{tutorial_slug}/node/{node_id}")
+async def delete_node(
+    tutorial_slug: str,
+    node_id: int,
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
+):
+    return await admin_controller.delete_node(
+        session=session, tutorial_slug=tutorial_slug, node_id=node_id
+    )
+
+
+@admin_router.delete("/{tutorial_slug}/node/{node_id}/hard")
+async def hard_delete_node(
+    tutorial_slug: str,
+    node_id: int,
+    session: AsyncSession = Depends(get_session),
+    # Only Super Admin can hard delete
+    curr_admin: TokenPayload = Depends(
+        RoleChecker([AdminRole.SUPER_ADMIN.value], user_type="admin")
+    ),
+):
+    return await admin_controller.hard_delete_node(
+        session=session, tutorial_slug=tutorial_slug, node_id=node_id
     )
