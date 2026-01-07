@@ -18,7 +18,11 @@ def cached(key_prefix: str, response_model: Type[T], ttl: int = 3600, tags: List
             sig = inspect.signature(func).bind(*args, **kwargs)
             sig.apply_defaults()
             # Remove 'self' and 'session' from cache key context
-            clean_args = {k: v for k, v in sig.arguments.items() if k not in ("self", "session")}
+            clean_args = {
+                k: v
+                for k, v in sig.arguments.items()
+                if k not in ("self", "session") and v is not None
+            }
 
             cache_key = f"{key_prefix}:" + ":".join(map(str, clean_args.values()))
 
@@ -39,7 +43,19 @@ def cached(key_prefix: str, response_model: Type[T], ttl: int = 3600, tags: List
                 adapter = TypeAdapter(response_model)
                 validated_result = adapter.validate_python(result)
 
-                dynamic_tags = [t.format(**sig.arguments) for t in (tags or [])]
+                dynamic_tags = []
+                for t in tags or []:
+                    try:
+                        import string
+
+                        field_names = [
+                            fname for _, fname, _, _ in string.Formatter().parse(t) if fname
+                        ]
+                        if all(sig.arguments.get(f) is not None for f in field_names):
+                            dynamic_tags.append(t.format(**sig.arguments))
+                    except Exception:
+                        # If formatting fails or logic error, skip tag
+                        continue
                 # Cache the JSON representation
                 json_data = adapter.dump_json(validated_result).decode("utf-8")
                 await redis_client.set_with_tags(cache_key, json_data, ttl, dynamic_tags)
@@ -60,7 +76,16 @@ def invalidate_cache(tags: List[str]):
             # Resolve tags like "job_{job_slug}" using arguments
             sig = inspect.signature(func).bind(*args, **kwargs)
             sig.apply_defaults()
-            dynamic_tags = [t.format(**sig.arguments) for t in tags]
+            dynamic_tags = []
+            import string
+
+            for t in tags:
+                try:
+                    field_names = [fname for _, fname, _, _ in string.Formatter().parse(t) if fname]
+                    if all(sig.arguments.get(f) is not None for f in field_names):
+                        dynamic_tags.append(t.format(**sig.arguments))
+                except Exception:
+                    continue
 
             await redis_client.invalidate_tags(dynamic_tags)
             return result

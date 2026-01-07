@@ -62,6 +62,69 @@ class AdminService(BaseService):
                 "status": False,
             }
 
+    @invalidate_cache(tags=["tutorial_{tutorial_slug}", "tutorial_list"])
+    async def publish_tutorial(self, session: AsyncSession, tutorial_slug: str, publish: bool):
+        statement = select(Tutorial).where(
+            Tutorial.slug == tutorial_slug, Tutorial.deleted_at.is_(None)
+        )
+        result = await session.exec(statement)
+        tutorial = result.one_or_none()
+
+        if not tutorial:
+            return {
+                "message": "Tutorial not found",
+                "status": False,
+            }
+
+        tutorial.is_published = publish
+
+        try:
+            session.add(tutorial)
+            await session.commit()
+            await session.refresh(tutorial)
+            return {
+                "message": "Tutorial published successfully",
+                "status": True,
+                "data": tutorial,
+            }
+        except Exception as e:
+            await session.rollback()
+            logger.exception(e)
+            return {
+                "message": "Something went wrong",
+                "status": False,
+            }
+
+    async def delete_tutorial(self, session: AsyncSession, tutorial_slug: str):
+        statement = select(Tutorial).where(Tutorial.slug == tutorial_slug)
+        result = await session.exec(statement)
+        tutorial = result.one_or_none()
+
+        if not tutorial:
+            return {
+                "message": "Tutorial not found",
+                "status": False,
+            }
+
+        tutorial.deleted_at = Tutorial.soft_delete()
+
+        try:
+            session.add(tutorial)
+            await session.commit()
+            await session.refresh(tutorial)
+            return {
+                "message": "Tutorial deleted successfully",
+                "status": True,
+                "data": tutorial,
+            }
+        except Exception as e:
+            await session.rollback()
+            logger.exception(e)
+            return {
+                "message": "Something went wrong",
+                "status": False,
+            }
+
     async def _check_slug_collision(
         self,
         session: AsyncSession,
@@ -142,15 +205,24 @@ class AdminService(BaseService):
 
         data_dict = node_data.model_dump(exclude={"node_type", "content"}, exclude_unset=True)
         # Handle Slug Change
-        if "title" in data_dict and data_dict["title"] != node.title:
-            new_slug = create_slug(data_dict["title"])
+        if ("title" in data_dict and data_dict["title"] != node.title) or (
+            "parent_id" in data_dict and data_dict["parent_id"] != node.parent_id
+        ):
+            new_title = data_dict.get("title", node.title)
+            new_parent_id = data_dict.get("parent_id", node.parent_id)
+
+            base_slug = create_slug(new_title)
+            if new_parent_id:
+                new_slug = f"{base_slug}-{new_parent_id}"
+            else:
+                new_slug = base_slug
 
             # Check for collision
             is_collision = await self._check_slug_collision(
                 session=session,
                 slug=new_slug,
                 tutorial_slug=tutorial_slug,
-                parent_id=node.parent_id,
+                parent_id=new_parent_id,
                 exclude_node_id=node_id,
             )
 
@@ -215,10 +287,67 @@ class AdminService(BaseService):
                 "status": False,
             }
 
+    async def publish_node(
+        self, session: AsyncSession, tutorial_slug: str, node_id: int, publish: bool
+    ):
+        statement = (
+            select(Node)
+            .where(
+                Node.id == node_id,
+                Node.tutorial_slug == tutorial_slug,
+                Node.deleted_at.is_(None),
+            )
+            .options(selectinload(Node.content), selectinload(Node.node_type))
+        )
+        result = await session.exec(statement)
+        node = result.one_or_none()
+
+        if not node:
+            return {
+                "message": "Node not found",
+                "status": False,
+            }
+
+        node.is_published = publish
+
+        try:
+            session.add(node)
+            await session.commit()
+
+            # Re-fetch node with options to ensure relationships are loaded
+            result = await session.exec(statement)
+            node = result.one()
+
+            # Invalidate cache
+            tags = [f"node_{tutorial_slug}_{node.slug}", f"tutorial_{tutorial_slug}"]
+            if node.parent_id:
+                parent_node = await session.get(Node, node.parent_id)
+                if parent_node:
+                    tags.append(f"node_{tutorial_slug}_{parent_node.slug}")
+            await redis_client.invalidate_tags(tags)
+
+            return {
+                "message": "Node published successfully",
+                "status": True,
+                "data": NodeOperationResponse.model_validate(node),
+            }
+        except Exception as e:
+            await session.rollback()
+            logger.exception(e)
+            return {
+                "message": "Something went wrong",
+                "status": False,
+            }
+
     @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}"])
     async def create_node(self, session: AsyncSession, tutorial_slug: str, node_data: NodeBase):
         data_dict = node_data.model_dump(exclude={"node_type", "content"})
-        data_dict["slug"] = create_slug(data_dict["title"])
+
+        base_slug = create_slug(data_dict["title"])
+        if data_dict["parent_id"]:
+            data_dict["slug"] = f"{base_slug}-{data_dict['parent_id']}"
+        else:
+            data_dict["slug"] = base_slug
 
         if data_dict["parent_id"]:
             # Verify parent exists
@@ -290,7 +419,10 @@ class AdminService(BaseService):
 
     @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}"])
     async def delete_node_soft(self, session: AsyncSession, tutorial_slug: str, node_id: int):
-        node = await session.get(Node, node_id)
+        statement = select(Node).where(Node.id == node_id).options(selectinload(Node.node_type))
+        result = await session.exec(statement)
+        node = result.one_or_none()
+
         if not node or node.deleted_at:
             return {
                 "message": "Node not found",
@@ -312,11 +444,14 @@ class AdminService(BaseService):
             session.add(node)
             await session.commit()
 
-            # Invalidate parent node cache
+            # Invalidate parent node cache and self
+            tags = [f"node_{tutorial_slug}_{node.slug}"]
             if node.parent_id:
                 parent_node = await session.get(Node, node.parent_id)
                 if parent_node:
-                    await redis_client.invalidate_tags([f"node_{tutorial_slug}_{parent_node.slug}"])
+                    tags.append(f"node_{tutorial_slug}_{parent_node.slug}")
+
+            await redis_client.invalidate_tags(tags)
 
             return {
                 "message": "Node deleted successfully",
@@ -330,9 +465,11 @@ class AdminService(BaseService):
                 "status": False,
             }
 
-    @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}", "job_{job_slug}"])
+    @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}"])
     async def delete_node_hard(self, session: AsyncSession, tutorial_slug: str, node_id: int):
-        node = await session.get(Node, node_id)
+        statement = select(Node).where(Node.id == node_id).options(selectinload(Node.node_type))
+        result = await session.exec(statement)
+        node = result.one_or_none()
         # For hard delete we might want to allow deleting already soft-deleted nodes too
         if not node:
             return {
@@ -356,11 +493,14 @@ class AdminService(BaseService):
             await session.delete(node)
             await session.commit()
 
-            # Invalidate parent node cache
+            # Invalidate parent node cache and self
+            tags = [f"node_{tutorial_slug}_{node.slug}", f"tutorial_{tutorial_slug}"]
             if node.parent_id:
                 parent_node = await session.get(Node, node.parent_id)
                 if parent_node:
-                    await redis_client.invalidate_tags([f"node_{tutorial_slug}_{parent_node.slug}"])
+                    tags.append(f"node_{tutorial_slug}_{parent_node.slug}")
+
+            await redis_client.invalidate_tags(tags)
 
             return {"message": "Node permanently deleted", "status": True}
         except Exception as e:

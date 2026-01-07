@@ -36,6 +36,14 @@ class AdminController(BaseController):
 
         return SuccessResponse(message=result["message"])
 
+    async def publish_tutorial(self, session: AsyncSession, tutorial_slug: str, publish: bool):
+        result = await self.admin_service.publish_tutorial(session, tutorial_slug, publish)
+
+        if not result["status"]:
+            return ErrorResponse(message=result["message"])
+
+        return SuccessResponse(message=result["message"])
+
     async def delete_tutorial(self, session: AsyncSession, tutorial_id: int):
         # pending
         result = await self.admin_service.delete_tutorial(session, tutorial_id)
@@ -59,7 +67,12 @@ class AdminController(BaseController):
 
         return SuccessResponse(message=result["message"], data=result["data"])
 
-    async def get_node(self, session: AsyncSession, tutorial_slug: str, node_slug: str):
+    async def get_node(
+        self,
+        session: AsyncSession,
+        tutorial_slug: str,
+        node_slug: str,
+    ):
         result = await self.admin_service.get_node(session, tutorial_slug, node_slug)
 
         if not result:
@@ -88,6 +101,20 @@ class AdminController(BaseController):
             return ErrorResponse(message=result["message"])
 
         return SuccessResponse(message=result["message"], data=result["data"])
+
+    async def publish_node(
+        self,
+        publish: bool,
+        session: AsyncSession,
+        tutorial_slug: str,
+        node_id: int,
+    ):
+        result = await self.admin_service.publish_node(session, tutorial_slug, node_id, publish)
+
+        if not result["status"]:
+            return ErrorResponse(message=result["message"])
+
+        return SuccessResponse(message=result["message"])
 
     async def delete_node(self, session: AsyncSession, tutorial_slug: str, node_id: int):
         result = await self.admin_service.delete_node_soft(session, tutorial_slug, node_id)

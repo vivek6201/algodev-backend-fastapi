@@ -81,6 +81,8 @@ class BaseService:
         # We rely on NodeResponse for the structure
         nodes_dto = []
         for node_orm in sorted_nodes:
+            if node_orm.deleted_at:
+                continue
             dto = self._to_node_dto(node_orm)
             nodes_dto.append(dto)
             node_map[dto.id] = dto

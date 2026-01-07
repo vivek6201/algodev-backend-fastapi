@@ -60,6 +60,20 @@ async def update_tutorial(
     )
 
 
+@admin_router.patch("/{tutorial_slug}/publish")
+async def publish_tutorial(
+    tutorial_slug: str,
+    publish: bool,
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(
+        RoleChecker([AdminRole.SUPER_ADMIN.value, AdminRole.ADMIN.value], user_type="admin")
+    ),
+):
+    return await admin_controller.publish_tutorial(
+        session=session, tutorial_slug=tutorial_slug, publish=publish
+    )
+
+
 # Nodes
 @admin_router.get("/node_type")
 async def get_all_node_types(
@@ -103,6 +117,21 @@ async def update_node(
         tutorial_slug=tutorial_slug,
         node_id=node_id,
         node_data=data,
+    )
+
+
+@admin_router.patch("/{tutorial_slug}/node/{node_id}/publish")
+async def publish_node(
+    tutorial_slug: str,
+    node_id: int,
+    publish: bool,
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(
+        RoleChecker([AdminRole.SUPER_ADMIN.value, AdminRole.ADMIN.value], user_type="admin")
+    ),
+):
+    return await admin_controller.publish_node(
+        session=session, tutorial_slug=tutorial_slug, node_id=node_id, publish=publish
     )
 
 
