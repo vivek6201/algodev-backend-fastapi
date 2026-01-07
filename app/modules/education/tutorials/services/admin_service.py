@@ -1,3 +1,6 @@
+from typing import Optional
+
+from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -7,10 +10,12 @@ from app.common.db.config import logger
 from app.common.lib.slug_utils import create_slug
 from app.modules.education.shared.model import EducationCategory
 
-from ..models.tutorials import Node, NodeType, Tutorial
+from ..models.tutorials import Node, NodeContent, NodeType, Tutorial
 from ..schemas.tutorials import (
     CreateNodeType,
     NodeBase,
+    NodeBaseUpdate,
+    NodeOperationResponse,
     TutorialBase,
 )
 from .base_service import BaseService
@@ -57,6 +62,33 @@ class AdminService(BaseService):
                 "status": False,
             }
 
+    async def _check_slug_collision(
+        self,
+        session: AsyncSession,
+        slug: str,
+        tutorial_slug: str,
+        parent_id: Optional[int],
+        exclude_node_id: Optional[int] = None,
+    ) -> bool:
+        """
+        Check if a node slug collides with existing nodes in the same hierarchy level.
+        Returns True if collision exists, False otherwise.
+        """
+        statement = select(Node).where(Node.slug == slug, Node.deleted_at.is_(None))
+
+        if parent_id:
+            statement = statement.where(Node.parent_id == parent_id)
+        else:
+            statement = statement.where(
+                Node.tutorial_slug == tutorial_slug, Node.parent_id.is_(None)
+            )
+
+        if exclude_node_id:
+            statement = statement.where(Node.id != exclude_node_id)
+
+        result = await session.exec(statement)
+        return result.first() is not None
+
     @invalidate_cache(tags=["node_types"])
     async def create_node_type(self, session: AsyncSession, node_type_data: CreateNodeType):
         data_dict = node_type_data.model_dump()
@@ -90,17 +122,103 @@ class AdminService(BaseService):
                 "status": False,
             }
 
-    @invalidate_cache(tags=["nodes_list"])
-    async def update_node(self, session: AsyncSession, node_id: int, node_data: NodeBase):
-        pass
+    async def update_node(
+        self, session: AsyncSession, tutorial_slug: str, node_id: int, node_data: NodeBaseUpdate
+    ):
+        # Eager load content, node type
+        statement = (
+            select(Node)
+            .where(Node.id == node_id)
+            .options(selectinload(Node.content), selectinload(Node.node_type))
+        )
+        result = await session.exec(statement)
+        node = result.one_or_none()
+
+        if not node or node.deleted_at:
+            return {
+                "message": "Node not found",
+                "status": False,
+            }
+
+        data_dict = node_data.model_dump(exclude={"node_type", "content"}, exclude_unset=True)
+        # Handle Slug Change
+        if "title" in data_dict and data_dict["title"] != node.title:
+            new_slug = create_slug(data_dict["title"])
+
+            # Check for collision
+            is_collision = await self._check_slug_collision(
+                session=session,
+                slug=new_slug,
+                tutorial_slug=tutorial_slug,
+                parent_id=node.parent_id,
+                exclude_node_id=node_id,
+            )
+
+            if is_collision:
+                return {
+                    "message": "Node with this title already exists in this level",
+                    "status": False,
+                }
+
+            node.slug = new_slug
+
+        # Update scalar fields
+        for key, value in data_dict.items():
+            setattr(node, key, value)
+
+        # Handle content
+        if node_data.content:
+            if node.content:
+                node.content.editorial = node_data.content.editorial
+                node.content.video_url = node_data.content.video_url
+                session.add(node.content)
+            else:
+                new_content = NodeContent(
+                    node_id=node.id,
+                    editorial=node_data.content.editorial,
+                    video_url=node_data.content.video_url,
+                )
+                session.add(new_content)
+
+        # Handle Type change
+        if node.node_type_id != node_data.node_type:
+            result = await session.exec(select(NodeType).where(NodeType.id == node_data.node_type))
+            existing_node_type = result.one_or_none()
+            if existing_node_type:
+                node.node_type = existing_node_type
+
+        try:
+            session.add(node)
+            await session.commit()
+            await session.refresh(node)
+
+            # Invalidate cache
+            tags = [f"node_{tutorial_slug}_{node.slug}"]
+            if node.parent_id:
+                # We need to fetch parent to get its slug for cache tag
+                parent_node = await session.get(Node, node.parent_id)
+                if parent_node:
+                    tags.append(f"node_{tutorial_slug}_{parent_node.slug}")
+
+            await redis_client.invalidate_tags(tags)
+
+            return {
+                "message": "Node updated successfully",
+                "status": True,
+                "data": NodeOperationResponse.model_validate(node),
+            }
+        except Exception as e:
+            await session.rollback()
+            logger.exception(e)
+            return {
+                "message": "Something went wrong",
+                "status": False,
+            }
 
     @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}"])
     async def create_node(self, session: AsyncSession, tutorial_slug: str, node_data: NodeBase):
-        data_dict = node_data.model_dump(exclude={"node_type"})
+        data_dict = node_data.model_dump(exclude={"node_type", "content"})
         data_dict["slug"] = create_slug(data_dict["title"])
-
-        # Check for existing node based on hierarchy
-        statement = select(Node).where(Node.slug == data_dict["slug"], Node.deleted_at.is_(None))
 
         if data_dict["parent_id"]:
             # Verify parent exists
@@ -111,18 +229,15 @@ class AdminService(BaseService):
                     "status": False,
                 }
 
-            # If child node, check uniqueness under same parent
-            statement = statement.where(Node.parent_id == data_dict["parent_id"])
-        else:
-            # If root node, check uniqueness under same tutorial
-            statement = statement.where(
-                Node.tutorial_slug == tutorial_slug, Node.parent_id.is_(None)
-            )
+        # Check for collision
+        is_collision = await self._check_slug_collision(
+            session=session,
+            slug=data_dict["slug"],
+            tutorial_slug=tutorial_slug,
+            parent_id=data_dict["parent_id"],
+        )
 
-        result = await session.exec(statement)
-        existing_node = result.first()
-
-        if existing_node:
+        if is_collision:
             return {
                 "message": "Node with this title already exists in this level",
                 "status": False,
@@ -146,6 +261,17 @@ class AdminService(BaseService):
             await session.commit()
             await session.refresh(node)
 
+            # Handle Metadata Creation
+            if node_data.content:
+                content = NodeContent(
+                    node_id=node.id,
+                    editorial=node_data.content.editorial,
+                    video_url=node_data.content.video_url,
+                )
+                session.add(content)
+                await session.commit()
+                await session.refresh(node)
+
             # Invalidate parent node cache if it exists
             if node.parent_id and parent_node:
                 await redis_client.invalidate_tags([f"node_{tutorial_slug}_{parent_node.slug}"])
@@ -153,7 +279,6 @@ class AdminService(BaseService):
             return {
                 "message": "Node created successfully",
                 "status": True,
-                "data": node,
             }
         except Exception as e:
             await session.rollback()

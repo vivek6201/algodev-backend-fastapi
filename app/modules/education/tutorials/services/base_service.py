@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.common.cache.decorators import cached
 from app.common.lib.formatter import ListResponse
 from app.modules.education.tutorials.schemas.tutorials import (
+    NodeContent,
     NodeResponse,
     NodeTypeResponse,
     TutorialResponse,
@@ -149,7 +150,7 @@ class BaseService:
         return None
 
     @cached(
-        key_prefix="node_{tutorial_slug}_{node_slug}",
+        key_prefix="tutorials",
         tags=["node_{tutorial_slug}_{node_slug}"],
         response_model=NodeResponse,
     )
@@ -163,7 +164,7 @@ class BaseService:
         # Fetch the target node and its direct children
         statement = select(Node).where(Node.slug == node_slug, Node.deleted_at.is_(None))
         statement = statement.where(Node.tutorial_slug == tutorial_slug)
-        statement = statement.options(selectinload(Node.node_type))
+        statement = statement.options(selectinload(Node.node_type), selectinload(Node.content))
 
         if is_published is not None:
             statement = statement.where(Node.is_published == is_published)
@@ -190,6 +191,8 @@ class BaseService:
 
         # 1. Target Node DTO
         target_dto = self._to_node_dto(node)
+        if node.content:
+            target_dto.content = NodeContent.model_validate(node.content)
 
         # 2. Children DTOs (with empty children)
         children_dtos = []

@@ -69,7 +69,7 @@ class Node(SoftDeleteMixin, SQLModel, table=True):
     )
     children: List["Node"] = Relationship(back_populates="parent")
 
-    node_metadata: Optional["NodeMetadata"] = Relationship(back_populates="node")
+    content: Optional["NodeContent"] = Relationship(back_populates="node")
 
     is_published: bool = Field(default=False, nullable=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -93,7 +93,7 @@ class NodeType(SoftDeleteMixin, SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class NodeMetadata(SoftDeleteMixin, SQLModel, table=True):
+class NodeContent(SoftDeleteMixin, SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     node_id: int = Field(
@@ -102,6 +102,7 @@ class NodeMetadata(SoftDeleteMixin, SQLModel, table=True):
         index=True,
     )
 
-    node: Node = Relationship(back_populates="node_metadata")
+    node: Node = Relationship(back_populates="content")
 
-    content: str = Field(default="", nullable=False)
+    editorial: str = Field(default="", nullable=False)
+    video_url: Optional[str] = Field(default=None, nullable=True)

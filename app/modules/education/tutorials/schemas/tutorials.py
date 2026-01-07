@@ -15,11 +15,24 @@ class TutorialUpdate(TutorialBase):
     categories: Optional[List[int]] = None
 
 
+class NodeContent(BaseModel):
+    editorial: str
+    video_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 class NodeBase(BaseModel):
     title: str
     order: int
     parent_id: Optional[int] = None
     node_type: int
+    content: Optional[NodeContent] = None
+
+
+class NodeBaseUpdate(NodeBase):
+    title: Optional[str] = None
+    order: Optional[int] = None
+    node_type: Optional[int] = None
 
 
 class CreateNodeType(BaseModel):
@@ -34,13 +47,18 @@ class NodeTypeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class NodeResponse(BaseModel):
+class NodeOperationResponse(NodeBase):
     id: int
-    title: str
     slug: str
-    order: int
     node_type: NodeTypeResponse
     parent_id: Optional[int] = None
+    is_published: Optional[bool] = False
+    content: Optional[NodeContent] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NodeResponse(NodeOperationResponse):
     children: List["NodeResponse"] = []
 
     model_config = ConfigDict(from_attributes=True)

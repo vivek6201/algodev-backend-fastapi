@@ -2,7 +2,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse
 
-from ..schemas.tutorials import CreateNodeType, NodeBase, TutorialBase
+from ..schemas.tutorials import (
+    CreateNodeType,
+    NodeBase,
+    NodeBaseUpdate,
+    TutorialBase,
+)
 from ..services.admin_service import AdminService
 from .base_controller import BaseController
 
@@ -64,6 +69,20 @@ class AdminController(BaseController):
 
     async def create_node(self, session: AsyncSession, tutorial_slug: str, node_data: NodeBase):
         result = await self.admin_service.create_node(session, tutorial_slug, node_data)
+
+        if not result["status"]:
+            return ErrorResponse(message=result["message"])
+
+        return SuccessResponse(message=result["message"])
+
+    async def update_node(
+        self,
+        session: AsyncSession,
+        tutorial_slug: str,
+        node_id: int,
+        node_data: NodeBaseUpdate,
+    ):
+        result = await self.admin_service.update_node(session, tutorial_slug, node_id, node_data)
 
         if not result["status"]:
             return ErrorResponse(message=result["message"])

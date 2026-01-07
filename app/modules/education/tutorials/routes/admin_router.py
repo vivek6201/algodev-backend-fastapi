@@ -7,7 +7,7 @@ from app.modules.auth.dependencies import ALL_ADMIN_ROLES, RoleChecker
 from app.modules.users.models.admin import AdminRole
 
 from ..controller.admin_controller import AdminController
-from ..schemas.tutorials import CreateNodeType, NodeBase, TutorialBase
+from ..schemas.tutorials import CreateNodeType, NodeBase, NodeBaseUpdate, TutorialBase
 
 admin_router = APIRouter()
 admin_controller = AdminController()
@@ -87,6 +87,22 @@ async def create_node(
 ):
     return await admin_controller.create_node(
         session=session, tutorial_slug=tutorial_slug, node_data=data
+    )
+
+
+@admin_router.patch("/{tutorial_slug}/node/{node_id}")
+async def update_node(
+    tutorial_slug: str,
+    node_id: int,
+    data: NodeBaseUpdate,
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
+):
+    return await admin_controller.update_node(
+        session=session,
+        tutorial_slug=tutorial_slug,
+        node_id=node_id,
+        node_data=data,
     )
 
 
