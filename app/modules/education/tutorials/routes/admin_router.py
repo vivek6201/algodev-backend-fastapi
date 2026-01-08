@@ -154,6 +154,17 @@ async def get_node(
     )
 
 
+@admin_router.delete("/one/{tutorial_slug}")
+async def delete_tutorial(
+    tutorial_slug: str,
+    session: AsyncSession = Depends(get_session),
+    curr_admin: TokenPayload = Depends(
+        RoleChecker([AdminRole.SUPER_ADMIN.value], user_type="admin")
+    ),
+):
+    return await admin_controller.delete_tutorial(session=session, tutorial_slug=tutorial_slug)
+
+
 @admin_router.delete("/{tutorial_slug}/node/{node_id}")
 async def delete_node(
     tutorial_slug: str,

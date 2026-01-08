@@ -95,6 +95,7 @@ class AdminService(BaseService):
                 "status": False,
             }
 
+    @invalidate_cache(tags=["tutorial_{tutorial_slug}", "tutorial_list"])
     async def delete_tutorial(self, session: AsyncSession, tutorial_slug: str):
         statement = select(Tutorial).where(Tutorial.slug == tutorial_slug)
         result = await session.exec(statement)
@@ -106,9 +107,8 @@ class AdminService(BaseService):
                 "status": False,
             }
 
-        tutorial.deleted_at = Tutorial.soft_delete()
-
         try:
+            tutorial.soft_delete()
             session.add(tutorial)
             await session.commit()
             await session.refresh(tutorial)

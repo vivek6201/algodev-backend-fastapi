@@ -44,9 +44,9 @@ class AdminController(BaseController):
 
         return SuccessResponse(message=result["message"])
 
-    async def delete_tutorial(self, session: AsyncSession, tutorial_id: int):
+    async def delete_tutorial(self, session: AsyncSession, tutorial_slug: str):
         # pending
-        result = await self.admin_service.delete_tutorial(session, tutorial_id)
+        result = await self.admin_service.delete_tutorial(session, tutorial_slug=tutorial_slug)
 
         if not result["status"]:
             return ErrorResponse(message=result["message"])
