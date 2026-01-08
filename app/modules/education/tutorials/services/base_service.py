@@ -21,7 +21,7 @@ class BaseService:
     @cached(
         key_prefix="tutorials",
         tags=["tutorial_list"],
-        response_model=ListResponse[Tutorial],
+        response_model=ListResponse[TutorialResponse],
     )
     async def get_tutorials(
         self,
@@ -30,7 +30,7 @@ class BaseService:
         limit: int,
         search: str,
         is_published: Optional[bool] = None,
-    ) -> ListResponse[Tutorial]:
+    ) -> ListResponse[TutorialResponse]:
         search = search.strip()
         page = int(page)
         limit = int(limit)
@@ -49,14 +49,27 @@ class BaseService:
         total_items = (await session.exec(count_statement)).one()
 
         # Get paginated data
-        statement = select(Tutorial).where(*filters).offset((page - 1) * limit).limit(limit)
+        statement = (
+            select(Tutorial)
+            .where(*filters)
+            .offset((page - 1) * limit)
+            .limit(limit)
+            .options(selectinload(Tutorial.categories))
+        )
 
         result = await session.exec(statement)
-        data = result.all()
+
+        data: List[TutorialResponse] = []
+        for t in result.all():
+            t_data = t.model_dump()
+            categories = t.categories
+            data.append(TutorialResponse(**t_data, categories=categories))
 
         total_pages = math.ceil(total_items / limit) if limit > 0 else 1
 
-        return ListResponse[Tutorial](data=data, total_items=total_items, total_pages=total_pages)
+        return ListResponse[TutorialResponse](
+            data=data, total_items=total_items, total_pages=total_pages
+        )
 
     def _to_node_dto(self, node: Node) -> NodeResponse:
         """Helper to convert Node ORM to NodeResponse DTO."""
@@ -64,7 +77,7 @@ class BaseService:
         node_data["node_type"] = node.node_type
         return NodeResponse(**node_data)
 
-    def _build_node_tree_and_map(self, nodes: List[Node]):
+    def _build_node_tree_and_map(self, nodes: List[Node], is_published: Optional[bool] = None):
         """
         Manually build the tree from flat list of nodes.
         Returns both the list of root nodes and the map of all nodes.
@@ -74,15 +87,18 @@ class BaseService:
         roots = []
 
         # 1. Convert all ORM nodes to Pydantic models (without children yet)
-        # Use sorted to ensure order is respected
         sorted_nodes = sorted(nodes, key=lambda x: x.order)
 
         # Create a map for quick access
-        # We rely on NodeResponse for the structure
         nodes_dto = []
         for node_orm in sorted_nodes:
             if node_orm.deleted_at:
                 continue
+
+            # Filtering logic
+            if is_published is not None and node_orm.is_published != is_published:
+                continue
+
             dto = self._to_node_dto(node_orm)
             nodes_dto.append(dto)
             node_map[dto.id] = dto
@@ -91,13 +107,15 @@ class BaseService:
         for dto in nodes_dto:
             if dto.parent_id and dto.parent_id in node_map:
                 node_map[dto.parent_id].children.append(dto)
-            else:
+            elif dto.parent_id is None:
                 roots.append(dto)
 
         return roots, node_map
 
-    def _build_node_tree(self, nodes: List[Node]) -> List[NodeResponse]:
-        roots, _ = self._build_node_tree_and_map(nodes)
+    def _build_node_tree(
+        self, nodes: List[Node], is_published: Optional[bool] = None
+    ) -> List[NodeResponse]:
+        roots, _ = self._build_node_tree_and_map(nodes, is_published)
         return roots
 
     @cached(key_prefix="node_types", tags=["node_types"], response_model=List[NodeTypeResponse])
@@ -133,18 +151,15 @@ class BaseService:
         result = await session.exec(statement)
         tutorial = result.one_or_none()
         if tutorial:
-            roots = self._build_node_tree(tutorial.nodes)
+            roots = self._build_node_tree(tutorial.nodes, is_published=is_published)
 
             # 3. Create TutorialResponse
             # validata/dump tutorial fields
             tut_data = tutorial.model_dump()
             response = TutorialResponse(**tut_data)
 
-            # 4. Assign constructed hierarchy
             response.nodes = roots
 
-            # 5. Handle categories explicitly if needed (or rely on from_attributes if validation works)
-            # Since we manually constructed response, we need to populate categories
             if tutorial.categories:
                 response.categories = tutorial.categories
 

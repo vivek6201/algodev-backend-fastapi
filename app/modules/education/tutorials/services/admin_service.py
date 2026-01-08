@@ -185,6 +185,7 @@ class AdminService(BaseService):
                 "status": False,
             }
 
+    @invalidate_cache(tags=["nodes_list", "tutorial_{tutorial_slug}"])
     async def update_node(
         self, session: AsyncSession, tutorial_slug: str, node_id: int, node_data: NodeBaseUpdate
     ):

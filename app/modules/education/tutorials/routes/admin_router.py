@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.db.config import get_session
-from app.common.lib.formatter import TokenPayload
+from app.common.lib.formatter import ErrorResponse, TokenPayload
 from app.modules.auth.dependencies import ALL_ADMIN_ROLES, RoleChecker
 from app.modules.users.models.admin import AdminRole
 
@@ -21,10 +21,17 @@ async def get_all_tutorials(
     curr_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
 ):
     query_params = request.query_params
+    limit = int(query_params.get("limit", 10))
+    page = int(query_params.get("page", 1))
+    search = query_params.get("search", "")
+
+    if limit < 1 or limit > 50:
+        return ErrorResponse(message="Limit must be between 1 and 50", status_code=400)
+
     params = {
-        "page": query_params.get("page", 1),
-        "limit": query_params.get("limit", 10),
-        "search": query_params.get("search", ""),
+        "page": page,
+        "limit": limit,
+        "search": search,
     }
 
     return await admin_controller.get_tutorials(session=session, params=params)

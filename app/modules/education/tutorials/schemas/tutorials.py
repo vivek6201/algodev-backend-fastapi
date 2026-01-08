@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -75,6 +76,9 @@ class TutorialResponse(TutorialBase):
     slug: str
     is_published: bool
     categories: List[CategoryResponse] = []
-    nodes: List[NodeResponse] = []
+    nodes: Optional[List[NodeResponse]] = None
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
