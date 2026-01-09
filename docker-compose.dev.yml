@@ -1,0 +1,62 @@
+services:
+  redis:
+    image: redis:7
+    container_name: algorithmicdev-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data-dev:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: algorithmicdev-postgres-dev
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=mysecretpass
+      - POSTGRES_DB=mydb
+    volumes:
+      - postgres-data-dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+
+  algorithmicdev-backend:
+    build: .
+    container_name: algorithmicdev-backend-dev
+    # Mount the current directory to /app for hot reloading
+    volumes:
+      - .:/app
+      - /app/.venv
+    # Use the dev command as requested for hot reload
+    command: [ "uv", "run", "dev" ]
+    ports:
+      - "4001:4001"
+    env_file:
+      - .env
+    environment:
+      - UV_CACHE_DIR=/app/.cache/uv
+      - UV_NO_CACHE=1
+      - CREATE_DEV_ADMIN=true
+      - RUN_MIGRATIONS=true
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - app-network
+
+volumes:
+  redis-data-dev:
+  postgres-data-dev:
+
+
+networks:
+  app-network:
+    driver: bridge

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.common.db.models import *  # noqa: F403
 from app.common.lib.exception_handlers import (
     general_exception_handler,
     validation_exception_handler,
@@ -13,13 +14,6 @@ from app.common.lib.exception_handlers import (
 from app.common.lib.lifespan import lifespan
 from app.config.router import router
 from app.config.settings import settings
-
-# importing models for alembic
-from app.modules.education.blogs.models.blog import *  # noqa: F403
-from app.modules.education.shared.model import *  # noqa: F403
-from app.modules.jobs.models.jobs import *  # noqa: F403
-from app.modules.users.models.admin import *  # noqa: F403
-from app.modules.users.models.user import *  # noqa: F403
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)
 

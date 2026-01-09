@@ -6,6 +6,7 @@ import redis.asyncio as redis
 from pydantic import BaseModel
 from redis.exceptions import RedisError
 
+from app.common.db.config import logger
 from app.config.settings import settings
 
 T = TypeVar("T")
@@ -34,7 +35,7 @@ class AsyncRedisClient:
                     socket_timeout=5,
                 )
             except Exception as e:
-                print(e)
+                logger.exception(e)
 
     def _get_tag_key(self, tag: str) -> str:
         return f"tag:{tag}"
@@ -57,7 +58,7 @@ class AsyncRedisClient:
                     pipe.expire(t_key, ttl)  # Tags live slightly longer than keys
                 await pipe.execute()
         except RedisError:
-            pass
+            logger.exception("Redis error")
 
     async def invalidate_tags(self, tags: List[str]):
         try:
@@ -76,7 +77,7 @@ class AsyncRedisClient:
                     pipe.delete(*tag_keys)
                     await pipe.execute()
         except RedisError:
-            pass
+            logger.exception("Redis error")
 
 
 redis_client = AsyncRedisClient()

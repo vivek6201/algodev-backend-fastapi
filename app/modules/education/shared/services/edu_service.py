@@ -20,7 +20,7 @@ class EducationService:
         except Exception as e:
             raise e
 
-    @cached(key_prefix="edu", tags=["edu_categories"], response_model=EducationCategory)
+    @cached(key_prefix="edu", tags=["edu_categories"], response_model=list[EducationCategory])
     async def get_categories(self, session: AsyncSession):
         try:
             result = await session.exec(select(EducationCategory))

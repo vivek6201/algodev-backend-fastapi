@@ -47,10 +47,32 @@ class BlogCategoryLink(SQLModel, table=True):
     )
 
 
+class TutorialCategoryLink(SQLModel, table=True):
+    """Tutorial ↔ Category many-to-many link"""
+
+    tutorial_id: Optional[int] = Field(
+        default=None,
+        foreign_key="tutorial.id",
+        primary_key=True,
+        ondelete="CASCADE",
+    )
+
+    category_id: Optional[int] = Field(
+        default=None,
+        foreign_key="educationcategory.id",
+        primary_key=True,
+        ondelete="CASCADE",
+    )
+
+
 class EducationCategory(CategoriesBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True, index=True)
 
     blogs: List["Blog"] = Relationship(back_populates="categories", link_model=BlogCategoryLink)  # noqa: F821
+    tutorials: List["Tutorial"] = Relationship(  # noqa: F821
+        back_populates="categories",
+        link_model=TutorialCategoryLink,
+    )
 
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(
