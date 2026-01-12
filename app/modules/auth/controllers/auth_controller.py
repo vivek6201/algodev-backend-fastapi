@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Request
@@ -53,7 +53,7 @@ class AuthController:
 
             # Generate verification token
             verification_token = secrets.token_urlsafe(32)
-            verification_expires = datetime.now() + timedelta(hours=24)
+            verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
 
             # Store verification token
             await self.user_service.update_user(
@@ -131,46 +131,29 @@ class AuthController:
 
         payload: TokenPayload = TokenPayload(id=user.id, email=user.email, role=user.role)
 
-        access_token = self.auth_service.create_access_token(payload)
-        refresh_token = self.auth_service.create_refresh_token(payload)
+        access_token, access_expiry = self.auth_service.create_access_token(payload)
+        refresh_token, refresh_expiry = self.auth_service.create_refresh_token(payload)
 
         if user.id is not None:
             await self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
 
         # Create response object
-        response = SuccessResponse(
+        return SuccessResponse(
             message="Login successful",
             data={
-                "id": user.id,
-                "email": user.email,
-                "role": user.role,
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "role": user.role,
+                },
+                "tokens": {
+                    "access_token": access_token,
+                    "expires_in": access_expiry,
+                    "refresh_token": refresh_token,
+                },
             },
             status_code=200,
         )
-
-        # Set tokens in HTTP-only cookies
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite="none",
-            domain=settings.DOMAIN,
-            path="/",
-            max_age=settings.ACCESS_TOKEN_EXPIRE_SECONDS,
-        )
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite="none",
-            domain=settings.DOMAIN,
-            path="/",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_SECONDS,
-        )
-
-        return response
 
     async def logout(self, session: AsyncSession, current_user: TokenPayload):
         user = await self.user_service.get_user(session, user_id=current_user.id)
@@ -181,15 +164,9 @@ class AuthController:
             await self.user_service.update_user(user.id, {"refresh_token": None}, session)
 
         # Create response object
-        response = SuccessResponse(
+        return SuccessResponse(
             message="Logout successful",
         )
-
-        # Clear cookies
-        response.delete_cookie(key="access_token")
-        response.delete_cookie(key="refresh_token")
-
-        return response
 
     async def verify_email(self, token: str, session: AsyncSession):
         """Verify user email using verification token"""
@@ -200,8 +177,23 @@ class AuthController:
             return ErrorResponse(message="Invalid verification token", status_code=400)
 
         # Check if token has expired
-        if user.verification_token_expires and user.verification_token_expires < datetime.now():
-            return ErrorResponse(message="Verification token has expired", status_code=400)
+        # Check if token has expired
+        verification_expires = user.verification_token_expires
+        if verification_expires:
+            if isinstance(verification_expires, str):
+                try:
+                    verification_expires = datetime.fromisoformat(verification_expires)
+                except ValueError:
+                    # Try parsing if it didn't match isoformat exactly or has specific format
+                    # But if it fails, we might just assume expired or log error
+                    return ErrorResponse(message="Invalid token expiration format", status_code=500)
+
+            # Ensure timezone awareness for comparison
+            if verification_expires.tzinfo is None:
+                verification_expires = verification_expires.replace(tzinfo=timezone.utc)
+
+            if verification_expires < datetime.now(timezone.utc):
+                return ErrorResponse(message="Verification token has expired", status_code=400)
 
         # Mark email as verified and clear verification token
         if user.id is not None:
@@ -258,45 +250,26 @@ class AuthController:
         payload: TokenPayload = TokenPayload(id=user.id, email=user.email, role=user.role)
 
         # Create new tokens
-        access_token = self.auth_service.create_access_token(payload)
-        refresh_token = self.auth_service.create_refresh_token(payload)
+        access_token, access_expiry = self.auth_service.create_access_token(payload)
+        refresh_token, refresh_expiry = self.auth_service.create_refresh_token(payload)
 
         # Update refresh token in database
         await self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
 
         # Create response object
-        response = SuccessResponse(
+        return SuccessResponse(
             message="Token refreshed successfully",
             data={
                 "user": {
                     "id": user.id,
                     "email": user.email,
                     "role": user.role,
-                }
+                },
+                "tokens": {
+                    "access_token": access_token,
+                    "expires_in": access_expiry,
+                    "refresh_token": refresh_token,
+                },
             },
             status_code=200,
         )
-
-        # Set new tokens in HTTP-only cookies
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            secure=not settings.DEBUG,
-            samesite="none",
-            domain=settings.DOMAIN,
-            path="/",
-            max_age=settings.ACCESS_TOKEN_EXPIRE_SECONDS,  # 1 hour
-        )
-        response.set_cookie(
-            key="refresh_token",
-            value=refresh_token,
-            httponly=True,
-            secure=not settings.DEBUG,
-            domain=settings.DOMAIN,
-            samesite="none",
-            path="/",
-            max_age=settings.REFRESH_TOKEN_EXPIRE_SECONDS,  # 7 days
-        )
-
-        return response
