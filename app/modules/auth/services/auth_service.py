@@ -67,7 +67,7 @@ class AuthService:
 
     def create_access_token(
         self, data: TokenPayload, expires_delta: Optional[timedelta | int] = None
-    ) -> tuple[str, datetime]:
+    ) -> tuple[str, int]:
         to_encode = data.__dict__.copy()
         if expires_delta:
             if isinstance(expires_delta, int):
@@ -81,11 +81,11 @@ class AuthService:
         encoded_jwt = jwt.encode(
             to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )
-        return encoded_jwt, expire
+        return encoded_jwt, int(expire.timestamp() * 1000)
 
     def create_refresh_token(
         self, data: TokenPayload, expires_delta: Optional[timedelta | int] = None
-    ) -> tuple[str, datetime]:
+    ) -> tuple[str, int]:
         to_encode = data.__dict__.copy()
         if expires_delta:
             if isinstance(expires_delta, int):
@@ -100,7 +100,7 @@ class AuthService:
             to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )
 
-        return encoded_jwt, expire
+        return encoded_jwt, int(expire.timestamp() * 1000)
 
     def verify_token(self, token: str):
         try:
