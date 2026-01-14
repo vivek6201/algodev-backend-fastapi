@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from bcrypt import checkpw, gensalt, hashpw
@@ -65,29 +65,42 @@ class AuthService:
             return False
         return True
 
-    def create_access_token(self, data: TokenPayload, expires_delta: Optional[timedelta] = None):
+    def create_access_token(
+        self, data: TokenPayload, expires_delta: Optional[timedelta | int] = None
+    ) -> tuple[str, datetime]:
         to_encode = data.__dict__.copy()
-        expire = datetime.now() + (
-            expires_delta or timedelta(minutes=self.settings.ACCESS_TOKEN_EXPIRE_SECONDS)
+        if expires_delta:
+            if isinstance(expires_delta, int):
+                expires_delta = timedelta(seconds=expires_delta)
+            expire = datetime.now(timezone.utc) + expires_delta
+        else:
+            expire = datetime.now(timezone.utc) + timedelta(
+                seconds=self.settings.ACCESS_TOKEN_EXPIRE_SECONDS
+            )
+        to_encode.update({"exp": expire})
+        encoded_jwt = jwt.encode(
+            to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )
+        return encoded_jwt, expire
+
+    def create_refresh_token(
+        self, data: TokenPayload, expires_delta: Optional[timedelta | int] = None
+    ) -> tuple[str, datetime]:
+        to_encode = data.__dict__.copy()
+        if expires_delta:
+            if isinstance(expires_delta, int):
+                expires_delta = timedelta(seconds=expires_delta)
+            expire = datetime.now(timezone.utc) + expires_delta
+        else:
+            expire = datetime.now(timezone.utc) + timedelta(
+                seconds=self.settings.REFRESH_TOKEN_EXPIRE_SECONDS
+            )
         to_encode.update({"exp": expire})
         encoded_jwt = jwt.encode(
             to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )
 
-        return encoded_jwt
-
-    def create_refresh_token(self, data: TokenPayload, expires_delta: Optional[timedelta] = None):
-        to_encode = data.__dict__.copy()
-        expire = datetime.now() + (
-            expires_delta or timedelta(minutes=self.settings.REFRESH_TOKEN_EXPIRE_SECONDS)
-        )
-        to_encode.update({"exp": expire})
-        encoded_jwt = jwt.encode(
-            to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
-        )
-
-        return encoded_jwt
+        return encoded_jwt, expire
 
     def verify_token(self, token: str):
         try:

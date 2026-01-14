@@ -3,7 +3,6 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
-from app.config.settings import settings
 from app.modules.auth.schemas.auth_validations import AdminLogin
 from app.modules.auth.services.admin_auth_service import AdminAuthService
 from app.modules.users.models.admin import Admin
@@ -39,8 +38,8 @@ class AdminAuthController:
             role=admin.role,
         )
 
-        access_token = self.admin_auth_service.create_access_token(payload)
-        refresh_token = self.admin_auth_service.create_refresh_token(payload)
+        access_token, access_expiry = self.admin_auth_service.create_access_token(payload, 300)
+        refresh_token, _ = self.admin_auth_service.create_refresh_token(payload, 3600)
 
         if admin.id is not None:
             await self.admin_service.update_admin(
@@ -48,39 +47,22 @@ class AdminAuthController:
             )
 
         # Create response object
-        response = SuccessResponse(
+        return SuccessResponse(
             message="Admin logged in successfully",
             data={
-                "id": admin.id,
-                "email": admin.email,
-                "role": admin.role,
+                "user": {
+                    "id": admin.id,
+                    "email": admin.email,
+                    "role": admin.role,
+                },
+                "tokens": {
+                    "access_token": access_token,
+                    "expires_in": access_expiry,
+                    "refresh_token": refresh_token,
+                },
             },
             status_code=200,
         )
-
-        # Set tokens in HTTP-only cookies
-        response.set_cookie(
-            key="admin_access_token",
-            value=access_token,
-            httponly=True,
-            max_age=60,
-            path="/",
-            secure=not settings.DEBUG,
-            samesite="none",
-            domain=settings.DOMAIN,
-        )
-        response.set_cookie(
-            key="admin_refresh_token",
-            value=refresh_token,
-            httponly=True,
-            max_age=3600,
-            path="/",
-            secure=not settings.DEBUG,
-            samesite="none",
-            domain=settings.DOMAIN,
-        )
-
-        return response
 
     async def admin_logout(self, session: AsyncSession, current_admin: TokenPayload):
         admin = await self.admin_service.get_admin(admin_id=current_admin.id, session=session)
@@ -91,16 +73,9 @@ class AdminAuthController:
         if admin.id is not None:
             await self.admin_service.update_admin(admin.id, {"refresh_token": None}, session)
 
-        # Create response object
-        response = SuccessResponse(
+        return SuccessResponse(
             message="Admin logged out successfully",
         )
-
-        # Clear cookies
-        response.delete_cookie(key="admin_access_token")
-        response.delete_cookie(key="admin_refresh_token")
-
-        return response
 
     async def refresh_admin_token(self, session: AsyncSession, request: Request):
         refresh_token = request.cookies.get("admin_refresh_token")
@@ -129,45 +104,27 @@ class AdminAuthController:
             role=admin.role,
         )
 
-        access_token = self.admin_auth_service.create_access_token(payload)
-        refresh_token = self.admin_auth_service.create_refresh_token(payload)
+        access_token, access_expiry = self.admin_auth_service.create_access_token(payload, 300)
+        refresh_token, _ = self.admin_auth_service.create_refresh_token(payload, 3600)
 
         if admin.id is not None:
             await self.admin_service.update_admin(
                 admin.id, {"refresh_token": refresh_token}, session
             )
 
-        response = SuccessResponse(
+        return SuccessResponse(
             message="Token refreshed successfully",
             data={
-                "id": admin.id,
-                "email": admin.email,
-                "role": admin.role,
+                "user": {
+                    "id": admin.id,
+                    "email": admin.email,
+                    "role": admin.role,
+                },
+                "tokens": {
+                    "access_token": access_token,
+                    "expires_in": access_expiry,
+                    "refresh_token": refresh_token,
+                },
             },
             status_code=200,
         )
-
-        # Set tokens in HTTP-only cookies
-        response.set_cookie(
-            key="admin_access_token",
-            value=access_token,
-            httponly=True,
-            max_age=60,
-            path="/",
-            secure=not settings.DEBUG,
-            samesite="none",
-            domain=settings.DOMAIN,
-        )
-
-        response.set_cookie(
-            key="admin_refresh_token",
-            value=refresh_token,
-            httponly=True,
-            max_age=3600,
-            path="/",
-            secure=not settings.DEBUG,
-            samesite="none",
-            domain=settings.DOMAIN,
-        )
-
-        return response
