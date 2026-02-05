@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -67,7 +68,7 @@ class AuthService:
 
     def create_access_token(
         self, data: TokenPayload, expires_delta: Optional[timedelta | int] = None
-    ) -> tuple[str, datetime]:
+    ) -> tuple[str, int]:
         to_encode = data.__dict__.copy()
         if expires_delta:
             if isinstance(expires_delta, int):
@@ -77,15 +78,15 @@ class AuthService:
             expire = datetime.now(timezone.utc) + timedelta(
                 seconds=self.settings.ACCESS_TOKEN_EXPIRE_SECONDS
             )
-        to_encode.update({"exp": expire})
+        to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
         encoded_jwt = jwt.encode(
             to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )
-        return encoded_jwt, expire
+        return encoded_jwt, int(expire.timestamp() * 1000)
 
     def create_refresh_token(
         self, data: TokenPayload, expires_delta: Optional[timedelta | int] = None
-    ) -> tuple[str, datetime]:
+    ) -> tuple[str, int]:
         to_encode = data.__dict__.copy()
         if expires_delta:
             if isinstance(expires_delta, int):
@@ -95,12 +96,12 @@ class AuthService:
             expire = datetime.now(timezone.utc) + timedelta(
                 seconds=self.settings.REFRESH_TOKEN_EXPIRE_SECONDS
             )
-        to_encode.update({"exp": expire})
+        to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
         encoded_jwt = jwt.encode(
             to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )
 
-        return encoded_jwt, expire
+        return encoded_jwt, int(expire.timestamp() * 1000)
 
     def verify_token(self, token: str):
         try:

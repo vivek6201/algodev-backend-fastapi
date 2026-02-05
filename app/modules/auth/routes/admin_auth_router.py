@@ -16,12 +16,13 @@ async def admin_login(body: AdminLogin, session: AsyncSession = Depends(get_sess
     return await admin_auth_controller.admin_login(body, session)
 
 
-@admin_auth_router.delete("/logout")
+@admin_auth_router.post("/logout")
 async def admin_logout(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     current_admin: TokenPayload = Depends(RoleChecker(ALL_ADMIN_ROLES, user_type="admin")),
 ):
-    return await admin_auth_controller.admin_logout(session, current_admin)
+    return await admin_auth_controller.admin_logout(session, current_admin, request)
 
 
 @admin_auth_router.post("/refresh")

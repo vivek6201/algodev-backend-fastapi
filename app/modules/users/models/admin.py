@@ -5,6 +5,7 @@ from typing import List, Optional
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel, func
 
 from app.common.db.utils import pg_enum
+from app.modules.auth.models.session import AdminSession
 
 
 class AdminRole(str, Enum):
@@ -23,10 +24,11 @@ class Admin(SQLModel, table=True):
     password: str
     role: AdminRole = pg_enum(AdminRole, default=AdminRole.ADMIN, nullable=False)
 
-    refresh_token: Optional[str] = Field(default=None, index=True)
-
     # Relationships
     posted_jobs: List["Job"] = Relationship(back_populates="admin")  # noqa: F821
+    sessions: List["AdminSession"] = Relationship(
+        back_populates="admin", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
     # timestamp fields
     created_at: datetime = Field(

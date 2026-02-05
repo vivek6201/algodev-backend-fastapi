@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 
 from sqlmodel import select
@@ -85,6 +86,34 @@ class UserService:
         try:
             result = await session.exec(select(Users))
             return list(result.all())
+        except Exception as e:
+            await session.rollback()
+            raise e
+
+    @invalidate_cache(tags=["user_{user_id}", "users_list"])
+    async def verify_email(self, token: str, session: AsyncSession) -> bool:
+        try:
+            # Get user by token
+            result = await session.exec(select(Users).where(Users.verification_token == token))
+            user = result.first()
+
+            if not user:
+                return "Invalid token"
+
+            # Check expiry
+            if user.verification_token_expires and user.verification_token_expires < datetime.now():
+                return "Token expired"
+
+            # Update user
+            user.email_verified = True
+            user.verification_token = None
+            user.verification_token_expires = None
+
+            session.add(user)
+            await session.commit()
+            await session.refresh(user)
+
+            return user
         except Exception as e:
             await session.rollback()
             raise e
