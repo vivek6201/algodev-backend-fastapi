@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -77,7 +78,7 @@ class AuthService:
             expire = datetime.now(timezone.utc) + timedelta(
                 seconds=self.settings.ACCESS_TOKEN_EXPIRE_SECONDS
             )
-        to_encode.update({"exp": expire})
+        to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
         encoded_jwt = jwt.encode(
             to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )
@@ -95,7 +96,7 @@ class AuthService:
             expire = datetime.now(timezone.utc) + timedelta(
                 seconds=self.settings.REFRESH_TOKEN_EXPIRE_SECONDS
             )
-        to_encode.update({"exp": expire})
+        to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
         encoded_jwt = jwt.encode(
             to_encode, self.settings.SECRET_KEY, algorithm=self.settings.ALGORITHM
         )

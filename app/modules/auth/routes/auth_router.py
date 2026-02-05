@@ -25,21 +25,22 @@ async def signup(
     session: AsyncSession = Depends(get_session),
 ):
     return await auth_controller.signup(
-        data=signup_data, session=session, background_tasks=background_tasks
+        user=signup_data, session=session, background_tasks=background_tasks
     )
 
 
 @auth_router.post("/refresh")
 async def refresh_token(request: Request, session: AsyncSession = Depends(get_session)):
-    return await auth_controller.refresh(session, request)
+    return await auth_controller.refresh(request, session)
 
 
-@auth_router.delete("/logout")
+@auth_router.post("/logout")
 async def logout(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: TokenPayload = Depends(RoleChecker(ALL_USER_ROLES)),
 ):
-    return await auth_controller.logout(session=session, current_user=current_user)
+    return await auth_controller.logout(session=session, current_user=current_user, request=request)
 
 
 @auth_router.get("/verify-email/{token}")

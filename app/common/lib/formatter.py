@@ -49,6 +49,7 @@ class TokenPayload(BaseModel):
     id: int
     email: str
     role: str
+    session_id: Optional[str] = None
     exp: Optional[int] = None
 
 

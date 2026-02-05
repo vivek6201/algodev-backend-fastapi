@@ -1,15 +1,19 @@
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Request
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.common.lib.formatter import ErrorResponse, SuccessResponse, TokenPayload
 from app.config.settings import settings
-from app.modules.auth.schemas.auth_validations import Login, Signup
+from app.modules.auth.models.session import Session
+from app.modules.auth.schemas.auth_validations import Login
 from app.modules.auth.services.auth_service import AuthService
 from app.modules.common.services.email_service import email_service
+from app.modules.users.models.user import Users
 from app.modules.users.services.user_service import UserService
 
 
@@ -18,70 +22,60 @@ class AuthController:
         self.auth_service = AuthService()
         self.user_service = UserService()
 
-    async def signup(self, data: Signup, session: AsyncSession, background_tasks: BackgroundTasks):
-        try:
-            if data.password != data.confirm_password:
-                return ErrorResponse(
-                    message="Password and confirm password do not match", status_code=400
-                )
+    async def signup(self, user: Users, background_tasks: BackgroundTasks, session: AsyncSession):
+        # Check if user already exists
+        existing_user = await self.user_service.get_user(
+            session=session, email=user.email, username=user.username
+        )
+        if existing_user:
+            return ErrorResponse(message="User already exists", status_code=400)
 
-            # Check if user already exists by email or username
-            existing_user_by_email = await self.user_service.get_user(session, email=data.email)
-            if existing_user_by_email:
-                return ErrorResponse(message="Email already registered", status_code=400)
+        # Generate verification token
+        verification_token = secrets.token_urlsafe(32)
+        verification_expires = (datetime.now(timezone.utc) + timedelta(hours=24)).replace(
+            tzinfo=None
+        )
 
-            existing_user_by_username = await self.user_service.get_user(
-                session, username=data.username
-            )
-            if existing_user_by_username:
-                return ErrorResponse(message="Username already taken", status_code=400)
+        # Hash password
+        hashed_password = self.auth_service.hash_password(user.password)
 
-            # Create new user
-            hashed_password = self.auth_service.hash_password(data.password)
-            user_data = {
-                "first_name": data.first_name,
-                "last_name": data.last_name,
-                "email": data.email,
+        # Prepare user data
+        user_data = user.model_dump()
+        user_data.update(
+            {
                 "password": hashed_password,
-                "username": data.username,
+                "verification_token": verification_token,
+                "verification_token_expires": verification_expires,
+                "email_verified": False,
             }
+        )
+
+        try:
+            # Create user
             new_user = await self.user_service.create_user(user_data, session)
 
             if new_user is None or new_user.id is None:
                 await session.rollback()
                 return ErrorResponse(message="Failed to create user", status_code=500)
 
-            # Generate verification token
-            verification_token = secrets.token_urlsafe(32)
-            verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
-
-            # Store verification token
-            await self.user_service.update_user(
-                new_user.id,
-                {
-                    "verification_token": verification_token,
-                    "verification_token_expires": verification_expires,
-                },
-                session,
-            )
-
-            # Send verification email
+            # Prepare Email
             template_path = Path("app/modules/common/email-templates/verify-email.html")
             if not template_path.exists():
+                # Fallback or log error? User requested "create user must fail if template missing"?
+                # The user code had: if not template_path.exists(): return ErrorResponse
                 await session.rollback()
                 return ErrorResponse(message="Email template not found", status_code=500)
 
             template_content = template_path.read_text(encoding="utf-8")
 
-            verification_link: str = (
-                f"{settings.USER_APP_URL}/verify-email?token={verification_token}"
-            )
+            verification_link = f"{settings.USER_APP_URL}/verify-email?token={verification_token}"
 
             html_content = template_content.replace(
                 "{{name}}", f"{new_user.first_name} {new_user.last_name}"
             )
             html_content = html_content.replace("{{verify_link}}", verification_link)
 
+            # Add background task
             background_tasks.add_task(
                 email_service.send_mail,
                 recievers_list=[new_user.email],
@@ -89,9 +83,7 @@ class AuthController:
                 html=html_content,
             )
 
-            # Commit the transaction only after all operations succeed
             await session.commit()
-
             return SuccessResponse(
                 message="User created successfully. Please verify your email.",
                 data={
@@ -102,48 +94,81 @@ class AuthController:
                 },
                 status_code=201,
             )
+
         except Exception as e:
             await session.rollback()
-            return ErrorResponse(message="Signup failed", error=e, status_code=500)
+            return ErrorResponse(message=str(e), status_code=500)
 
-    async def login(self, data: Login, session: AsyncSession):
-        user = None
-        if data.email:
-            user = await self.user_service.get_user(session, email=data.email)
-        if data.username:
-            user = await self.user_service.get_user(session, username=data.username)
+    async def login(self, body: Login, session: AsyncSession):
+        try:
+            user = await self.user_service.get_user(
+                session=session, email=body.email, username=body.username
+            )
+        except Exception as e:
+            return ErrorResponse(message=str(e), status_code=500)
 
         if not user:
             return ErrorResponse(message="User not found", status_code=404)
 
-        if not self.auth_service.verify_password(data.password, user.password):
+        if not self.auth_service.verify_password(body.password, user.password):
             return ErrorResponse(message="Invalid credentials", status_code=400)
 
-        # Check email verification
-        if not user.email_verified:
-            return ErrorResponse(
-                message="Email not verified. Please verify your email before logging in.",
-                status_code=400,
+        # Enforce Max Sessions Policy
+        if user.id is not None:
+            active_sessions_result = await session.exec(
+                select(Session).where(Session.user_id == user.id).order_by(Session.created_at.asc())
             )
+            active_sessions = active_sessions_result.all()
+
+            # If current sessions >= max_sessions, remove oldest ones
+            # We are about to add 1 more, so if we have N sessions and limit is N, we need to remove at least 1.
+            # Wait, if we are at limit, we remove (count - limit + 1)
+
+            current_count = len(active_sessions)
+            sessions_to_delete = 0
+
+            if current_count >= user.max_sessions:
+                sessions_to_delete = current_count - user.max_sessions + 1
+
+            if sessions_to_delete > 0:
+                for i in range(sessions_to_delete):
+                    await session.delete(active_sessions[i])
+
+        # Generate Session ID
+        session_id = uuid.uuid4()
 
         if user.id is None:
-            return ErrorResponse(message="User ID is missing", status_code=400)
+            return ErrorResponse(message="User ID is missing", status_code=500)
 
-        payload: TokenPayload = TokenPayload(id=user.id, email=user.email, role=user.role)
+        payload = TokenPayload(
+            id=user.id, email=user.email, role=user.role, session_id=str(session_id)
+        )
 
         access_token, access_expiry = self.auth_service.create_access_token(payload)
         refresh_token, refresh_expiry = self.auth_service.create_refresh_token(payload)
 
-        if user.id is not None:
-            await self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
+        # Create new session
+        new_session = Session(
+            id=session_id,
+            user_id=user.id,
+            refresh_token=refresh_token,
+            expires_at=datetime.fromtimestamp(refresh_expiry / 1000, tz=timezone.utc),
+            user_agent=None,  # context needed
+            ip_address=None,  # context needed
+        )
+        session.add(new_session)
+        await session.commit()
 
         # Create response object
         return SuccessResponse(
-            message="Login successful",
+            message="User logged in successfully",
             data={
                 "user": {
                     "id": user.id,
                     "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "username": user.username,
                     "role": user.role,
                 },
                 "tokens": {
@@ -155,120 +180,128 @@ class AuthController:
             status_code=200,
         )
 
-    async def logout(self, session: AsyncSession, current_user: TokenPayload):
-        user = await self.user_service.get_user(session, user_id=current_user.id)
-        if not user:
-            return ErrorResponse(message="User not found", status_code=404)
-
-        if user.id is not None:
-            await self.user_service.update_user(user.id, {"refresh_token": None}, session)
-
-        # Create response object
-        return SuccessResponse(
-            message="Logout successful",
-        )
-
     async def verify_email(self, token: str, session: AsyncSession):
-        """Verify user email using verification token"""
-        # Find user with this verification token
-        user = await self.user_service.get_user(session, verification_token=token)
+        try:
+            result = await self.user_service.verify_email(token, session)
 
-        if not user:
-            return ErrorResponse(message="Invalid verification token", status_code=400)
+            if isinstance(result, str):
+                return ErrorResponse(message=result, status_code=400)
 
-        # Check if token has expired
-        # Check if token has expired
-        verification_expires = user.verification_token_expires
-        if verification_expires:
-            if isinstance(verification_expires, str):
-                try:
-                    verification_expires = datetime.fromisoformat(verification_expires)
-                except ValueError:
-                    # Try parsing if it didn't match isoformat exactly or has specific format
-                    # But if it fails, we might just assume expired or log error
-                    return ErrorResponse(message="Invalid token expiration format", status_code=500)
+            return SuccessResponse(message="Email verified successfully", status_code=200)
+        except Exception as e:
+            return ErrorResponse(message=str(e), status_code=500)
 
-            # Ensure timezone awareness for comparison
-            if verification_expires.tzinfo is None:
-                verification_expires = verification_expires.replace(tzinfo=timezone.utc)
+    async def logout(self, session: AsyncSession, request: Request, current_user: TokenPayload):
+        session_id = current_user.session_id
+        if session_id:
+            try:
+                # Delete by Session ID
+                statement = select(Session).where(Session.id == uuid.UUID(session_id))
+                result = await session.exec(statement)
+                session_obj = result.first()
 
-            if verification_expires < datetime.now(timezone.utc):
-                return ErrorResponse(message="Verification token has expired", status_code=400)
-
-        # Mark email as verified and clear verification token
-        if user.id is not None:
-            await self.user_service.update_user(
-                user.id,
-                {
-                    "email_verified": True,
-                    "verification_token": None,
-                    "verification_token_expires": None,
-                },
-                session,
-            )
+                if session_obj:
+                    await session.delete(session_obj)
+                    await session.commit()
+            except Exception:
+                pass
 
         return SuccessResponse(
-            message="Email verified successfully. You can now log in.", status_code=200
+            message="User logged out successfully",
         )
 
-    async def refresh(self, session: AsyncSession, request: Request):
-        """Refresh access and refresh tokens using a valid refresh token"""
-
-        # Check cookies first, then fall back to headers
+    async def refresh(self, request: Request, session: AsyncSession):
         refresh_token = request.cookies.get("refresh_token")
+
         if not refresh_token:
             refresh_token = request.headers.get("refresh_token")
 
         if not refresh_token:
-            return ErrorResponse(message="Refresh token is missing", status_code=400)
+            return ErrorResponse(message="Refresh token not found", status_code=401)
 
-        curr_user = self.auth_service.get_current_user(refresh_token)
-
-        # Check if refresh token is expired
-        if curr_user.exp is not None and datetime.fromtimestamp(curr_user.exp) < datetime.now():
-            return ErrorResponse(message="Refresh token has expired", status_code=401)
-
-        # Get user from database
-        user = await self.user_service.get_user(session=session, user_id=curr_user.id)
-
-        # Validate refresh token
-        if not user or user.refresh_token is None:
+        try:
+            curr_user_payload = self.auth_service.verify_token(refresh_token)
+        except Exception:
             return ErrorResponse(message="Invalid refresh token", status_code=401)
 
-        # Check if the provided refresh token matches the one in the database
-        if user.refresh_token != refresh_token:
-            return ErrorResponse(message="Refresh token does not match", status_code=401)
+        # Check expiry
+        if (
+            curr_user_payload.get("exp") is not None
+            and datetime.fromtimestamp(curr_user_payload["exp"]) < datetime.now()
+        ):
+            return ErrorResponse(message="Refresh token has expired", status_code=401)
 
-        # TOKEN ROTATION: Invalidate old refresh token immediately
-        # This prevents token replay attacks
-        await self.user_service.update_user(user.id, {"refresh_token": None}, session)
+        user_id = curr_user_payload.get("id")
+        session_id_str = curr_user_payload.get("session_id")
 
-        # Ensure user ID is present
+        if not session_id_str:
+            return ErrorResponse(message="Invalid token payload", status_code=401)
+
+        user = await self.user_service.get_user(session=session, user_id=user_id)
+
+        # Validate against session table using ID
+        statement = select(Session).where(Session.id == uuid.UUID(session_id_str))
+        result = await session.exec(statement)
+        session_obj = result.first()
+
+        if not session_obj:
+            return ErrorResponse(
+                message="Invalid refresh token (session not found)", status_code=401
+            )
+
+        # Verify strict token match for security (detect reuse)
+        if session_obj.refresh_token != refresh_token:
+            # Logic for reused token attack detection -> invalidate all user sessions?
+            # For now just fail.
+            await session.delete(session_obj)  # Delete compromised session
+            await session.commit()
+            return ErrorResponse(message="Invalid refresh token (token mismatch)", status_code=401)
+
+        if session_obj.user_id != user.id:
+            return ErrorResponse(message="Invalid session owner", status_code=401)
+
+        # Delete old session (Rotation)
+        await session.delete(session_obj)
+
         if user.id is None:
             return ErrorResponse(message="User ID is missing", status_code=400)
 
-        payload: TokenPayload = TokenPayload(id=user.id, email=user.email, role=user.role)
+        # Generate new Session ID
+        new_session_id = uuid.uuid4()
+
+        payload: TokenPayload = TokenPayload(
+            id=user.id, email=user.email, role=user.role, session_id=str(new_session_id)
+        )
 
         # Create new tokens
         access_token, access_expiry = self.auth_service.create_access_token(payload)
-        refresh_token, refresh_expiry = self.auth_service.create_refresh_token(payload)
+        new_refresh_token, new_refresh_expiry = self.auth_service.create_refresh_token(payload)
 
-        # Update refresh token in database
-        await self.user_service.update_user(user.id, {"refresh_token": refresh_token}, session)
+        # Create new session (rotate)
+        new_session = Session(
+            id=new_session_id,
+            user_id=user.id,
+            refresh_token=new_refresh_token,
+            expires_at=datetime.fromtimestamp(new_refresh_expiry / 1000, tz=timezone.utc),
+        )
+        session.add(new_session)
+        await session.commit()
 
-        # Create response object
         return SuccessResponse(
             message="Token refreshed successfully",
             data={
                 "user": {
                     "id": user.id,
                     "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "username": user.username,
                     "role": user.role,
                 },
                 "tokens": {
                     "access_token": access_token,
                     "expires_in": access_expiry,
-                    "refresh_token": refresh_token,
+                    "refresh_token": new_refresh_token,
                 },
             },
             status_code=200,
